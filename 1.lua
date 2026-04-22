@@ -1,240 +1,3 @@
--- ==========================================
--- LICENSE KEY SYSTEM
--- ==========================================
-
-local KeySystem = {}
-KeySystem.Verified = false
-
--- Storage path for key
-local KeyFilePath = "./UsSuite/aotr/license_key.txt"
-if not isfolder("./UsSuite/aotr") then makefolder("./UsSuite/aotr") end
-
--- YOUR MASTER KEY (Isko change karo apni marzi se)
-local MASTER_KEY = "HUH"  -- <-- Yaha apna key likho
-
--- Function to save key
-local function SaveKey(key)
-    writefile(KeyFilePath, key)
-end
-
--- Function to load saved key
-local function LoadSavedKey()
-    if isfile(KeyFilePath) then
-        return readfile(KeyFilePath)
-    end
-    return nil
-end
-
--- Function to verify key
-local function VerifyKey(inputKey)
-    return inputKey == MASTER_KEY
-end
-
--- Create input GUI for key
-local function ShowKeyPrompt()
-    -- Create ScreenGui
-    local screenGui = Instance.new("ScreenGui")
-    screenGui.Name = "KeySystemGUI"
-    screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    screenGui.ResetOnSpawn = false
-    screenGui.Parent = game.CoreGui
-    
-    -- Main Frame
-    local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(0, 400, 0, 250)
-    frame.Position = UDim2.new(0.5, -200, 0.5, -125)
-    frame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
-    frame.BorderSizePixel = 0
-    frame.BackgroundTransparency = 0.95
-    frame.ClipsDescendants = true
-    frame.Parent = screenGui
-    
-    -- Corner rounding
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 12)
-    corner.Parent = frame
-    
-    -- Stroke
-    local stroke = Instance.new("UIStroke")
-    stroke.Thickness = 1
-    stroke.Color = Color3.fromRGB(80, 80, 100)
-    stroke.Parent = frame
-    
-    -- Title
-    local title = Instance.new("TextLabel")
-    title.Size = UDim2.new(1, 0, 0, 40)
-    title.Position = UDim2.new(0, 0, 0, 0)
-    title.BackgroundTransparency = 1
-    title.Text = "🔐 LICENSE VERIFICATION"
-    title.TextColor3 = Color3.fromRGB(255, 200, 100)
-    title.TextSize = 18
-    title.Font = Enum.Font.GothamBold
-    title.TextScaled = false
-    title.Parent = frame
-    
-    -- Subtitle
-    local subtitle = Instance.new("TextLabel")
-    subtitle.Size = UDim2.new(1, 0, 0, 30)
-    subtitle.Position = UDim2.new(0, 0, 0, 40)
-    subtitle.BackgroundTransparency = 1
-    subtitle.Text = "Enter your license key to continue"
-    subtitle.TextColor3 = Color3.fromRGB(150, 150, 170)
-    subtitle.TextSize = 13
-    subtitle.Font = Enum.Font.Gotham
-    subtitle.Parent = frame
-    
-    -- Input Box
-    local inputBox = Instance.new("TextBox")
-    inputBox.Size = UDim2.new(0.8, 0, 0, 45)
-    inputBox.Position = UDim2.new(0.1, 0, 0, 85)
-    inputBox.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
-    inputBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-    inputBox.Text = ""
-    inputBox.PlaceholderText = "Enter your key here..."
-    inputBox.TextSize = 14
-    inputBox.Font = Enum.Font.Gotham
-    inputBox.ClearTextOnFocus = false
-    inputBox.Parent = frame
-    
-    local inputCorner = Instance.new("UICorner")
-    inputCorner.CornerRadius = UDim.new(0, 8)
-    inputCorner.Parent = inputBox
-    
-    -- Error Label
-    local errorLabel = Instance.new("TextLabel")
-    errorLabel.Size = UDim2.new(1, 0, 0, 25)
-    errorLabel.Position = UDim2.new(0, 0, 0, 140)
-    errorLabel.BackgroundTransparency = 1
-    errorLabel.Text = ""
-    errorLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
-    errorLabel.TextSize = 12
-    errorLabel.Font = Enum.Font.Gotham
-    errorLabel.Parent = frame
-    
-    -- Verify Button
-    local verifyBtn = Instance.new("TextButton")
-    verifyBtn.Size = UDim2.new(0.35, 0, 0, 40)
-    verifyBtn.Position = UDim2.new(0.1, 0, 0, 175)
-    verifyBtn.BackgroundColor3 = Color3.fromRGB(70, 130, 200)
-    verifyBtn.Text = "VERIFY"
-    verifyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    verifyBtn.TextSize = 14
-    verifyBtn.Font = Enum.Font.GothamBold
-    verifyBtn.Parent = frame
-    
-    local btnCorner = Instance.new("UICorner")
-    btnCorner.CornerRadius = UDim.new(0, 6)
-    btnCorner.Parent = verifyBtn
-    
-    -- Close Button (X)
-    local closeBtn = Instance.new("TextButton")
-    closeBtn.Size = UDim2.new(0, 30, 0, 30)
-    closeBtn.Position = UDim2.new(1, -35, 0, 5)
-    closeBtn.BackgroundTransparency = 1
-    closeBtn.Text = "✕"
-    closeBtn.TextColor3 = Color3.fromRGB(150, 150, 170)
-    closeBtn.TextSize = 16
-    closeBtn.Font = Enum.Font.Gotham
-    closeBtn.Parent = frame
-    
-    -- Animation variables
-    local tweenService = game:GetService("TweenService")
-    frame.BackgroundTransparency = 0.95
-    local fadeIn = tweenService:Create(frame, TweenInfo.new(0.3), {BackgroundTransparency = 0.05})
-    fadeIn:Play()
-    
-    -- Verify function
-    local function OnVerify()
-        local enteredKey = inputBox.Text
-        if VerifyKey(enteredKey) then
-            KeySystem.Verified = true
-            SaveKey(enteredKey)
-            errorLabel.Text = "✓ Key verified successfully!"
-            errorLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
-            
-            -- Fade out and destroy GUI
-            local fadeOut = tweenService:Create(frame, TweenInfo.new(0.3), {BackgroundTransparency = 0.95})
-            fadeOut:Play()
-            fadeOut.Completed:Connect(function()
-                screenGui:Destroy()
-            end)
-            
-            -- Continue script execution
-            task.spawn(function()
-                print("License verified! Loading script...")
-                LoadMainScript()
-            end)
-        else
-            errorLabel.Text = "✗ Invalid key! Please try again."
-            errorLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
-            inputBox.Text = ""
-            inputBox.PlaceholderText = "Invalid key. Try again..."
-            task.wait(1.5)
-            inputBox.PlaceholderText = "Enter your key here..."
-            errorLabel.Text = ""
-        end
-    end
-    
-    verifyBtn.MouseButton1Click:Connect(OnVerify)
-    
-    closeBtn.MouseButton1Click:Connect(function()
-        if KeySystem.Verified then
-            screenGui:Destroy()
-        else
-            errorLabel.Text = "✗ You must enter a valid key to continue!"
-            errorLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
-        end
-    end)
-    
-    inputBox.FocusLost:Connect(function(enterPressed)
-        if enterPressed then
-            OnVerify()
-        end
-    end)
-    
-    -- Enter key press
-    game:GetService("UserInputService").InputBegan:Connect(function(input, gameProcessed)
-        if not gameProcessed and input.KeyCode == Enum.KeyCode.Return then
-            if inputBox:IsFocused() then
-                OnVerify()
-            end
-        end
-    end)
-end
-
--- Check for saved key on startup
-local savedKey = LoadSavedKey()
-if savedKey and VerifyKey(savedKey) then
-    KeySystem.Verified = true
-    print("Auto-verified with saved key!")
-    LoadMainScript()  -- Script ka main part yaha dalo
-else
-    -- Show key prompt
-    ShowKeyPrompt()
-    -- Wait for verification
-    repeat task.wait() until KeySystem.Verified
-end
-
--- ==========================================
--- YAHAN SE SCRIPT KA BAAKI PART HAI
--- ==========================================
-
-function LoadMainScript()
-    print("Script loaded successfully!")
-    
-    -- Aapka existing script ka code yaha aayega
-    -- (Jo bhi pehle likha tha sab kuch)
-    
-    -- For example:
-    -- repeat task.wait() until game:IsLoaded()
-    -- local Players = game:GetService("Players")
-    -- ... aapka original script ...
-    
-end
-
-
-
-
 -- aotr
 repeat task.wait() until game:IsLoaded()
 
@@ -313,11 +76,11 @@ local familyRaritiesOptions = {
 }
 
 -- Config system for persistent dropdown state
-if not isfolder("./UsSuite") then makefolder("./UsSuite") end
-if not isfolder("./UsSuite/aotr") then makefolder("./UsSuite/aotr") end
+if not isfolder("./THUH") then makefolder("./THUB") end
+if not isfolder("./THUB/aotr") then makefolder("./THUB/aotr") end
 
-local ConfigFile = "./UsSuite/aotr/dropdown_config.json"
-local returnCounterPath = "./UsSuite/aotr/return_lobby_counter.txt"
+local ConfigFile = "./THUB/aotr/dropdown_config.json"
+local returnCounterPath = "./THUB/aotr/return_lobby_counter.txt"
 local HttpService = game:GetService("HttpService")
 
 local function LoadConfig()
@@ -429,7 +192,7 @@ function AutoFarm:Start()
 		while self._running and not checkReady() do
 			if os.clock() - startTime > 10 then -- Notify every 10s if still waiting
 				Library:Notify({
-					Title = "Us Suite",
+					Title = "TITANIC HUB",
 					Description = "Still waiting for mission assets to load...",
 					Time = 5
 				})
@@ -857,7 +620,7 @@ local data = {
 	Special = {}
 }
 
-local path = "./UsSuite/aotr/games_played.txt"
+local path = "./THUB/aotr/games_played.txt"
 if not isfile(path) then writefile(path, "0") end
 local gamesPlayed = tonumber(readfile(path))
 
@@ -868,7 +631,7 @@ if rewards then
 		if not rewards.Visible then return end
 
 	gamesPlayed = gamesPlayed + 1
-		writefile("./UsSuite/aotr/games_played.txt", tostring(gamesPlayed))
+		writefile("./THUB/aotr/games_played.txt", tostring(gamesPlayed))
 
 		local gamesUntilReturn = tonumber(readfile(returnCounterPath)) or 0
 		local willReturn = false
@@ -966,7 +729,7 @@ if rewards then
 			local payload = {
 					content = hasSpecial and "MYTHICAL DROP! @everyone" or nil,
 					embeds = {{
-						title = "Us Rewards",
+						title = "TH Rewards",
 						color = hasSpecial and 0xff0000 or 0x2b2d31,
 
 
@@ -1009,7 +772,7 @@ if rewards then
 						},
 
 						footer = {
-							text = "Us Suite • " .. DateTime.now():FormatLocalTime("LTS", "en-us")
+							text = "TITANIC HUB • " .. DateTime.now():FormatLocalTime("LTS", "en-us")
 						},
 
 						timestamp = DateTime.now():ToIsoDate()
@@ -1293,7 +1056,7 @@ local function roll(targets, rarities)
 						}
 					},
 					footer = {
-						text = "Us Suite • " .. DateTime.now():FormatLocalTime("LTS", "en-us")
+						text = "TITANIC HUB • " .. DateTime.now():FormatLocalTime("LTS", "en-us")
 					},
 					timestamp = DateTime.now():ToIsoDate()
 				}}
@@ -1309,7 +1072,7 @@ local function roll(targets, rarities)
 
 		pcall(function()
 			Library:Notify({
-				Title = "Us Suite",
+				Title = "TITANIC HUB",
 				Description = "Target family rolled: " .. familyString,
 				Time = 5,
 			})
@@ -1443,8 +1206,8 @@ local Options = Library.Options
 local Toggles = Library.Toggles
 
 local Window = Library:CreateWindow({
-	Title = "Us Suite",
-	Footer = "AOT:R | Freemium",
+	Title = "TITANIC HUB",
+	Footer = "AOT:R | Free",
 	Center = true,
 	AutoShow = true,
 	Resizable = true,
@@ -2300,7 +2063,7 @@ Toggles.AutoRollToggle:OnChanged(function()
 	if getgenv().AutoRoll then
 		if game.PlaceId ~= 13379208636 then
 			Library:Notify({
-				Title = "Us Suite",
+				Title = "TITANIC HUB",
 				Description = "You must be in the lobby to use family roll features.",
 				Time = 3
 			})
@@ -2341,7 +2104,7 @@ FamilyRollGroup:AddInput("SelectFamily", {
 Options.SelectFamily:OnChanged(function()
 	if Options.SelectFamily.Value ~= "" then
 		Library:Notify({
-			Title = "Us Suite",
+			Title = "TITANIC HUB",
 			Description = "Families selected: " .. Options.SelectFamily.Value,
 			Time = 2
 		})
@@ -2405,8 +2168,8 @@ Library.ToggleKeybind = Options.MenuKeybind
 ThemeManager:SetLibrary(Library)
 SaveManager:SetLibrary(Library)
 
-ThemeManager:SetFolder("UsSuite/aotr")
-SaveManager:SetFolder("UsSuite/aotr")
+ThemeManager:SetFolder("THUB/aotr")
+SaveManager:SetFolder("THUB/aotr")
 
 SaveManager:BuildConfigSection(Tabs.Settings)
 ThemeManager:ApplyToTab(Tabs.Settings)
@@ -2439,7 +2202,7 @@ task.spawn(function()
 	if Toggles.AutoHideToggle.Value then
 		Library:Toggle(false)
 		Library:Notify({
-			Title = "Us Suite",
+			Title = "TITANIC HUB",
 			Description = "Auto Hid GUI",
 			Time = 2
 		})
