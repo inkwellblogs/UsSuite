@@ -2176,361 +2176,112 @@ ThemeManager:ApplyToTab(Tabs.Settings)
 
 ThemeManager:ApplyTheme("Jester")
 SaveManager:LoadAutoloadConfig()
+
 -- ==========================================
--- AUTO THUNDERSPEAR QUEST SYSTEM (Map Detection)
+-- AUTO TS QUEST - GIANT FOREST ONLY (Part 3)
 -- ==========================================
 
-getgenv().AutoTSQuest = false
+getgenv().AutoGiantForestQuest = false
 
--- TS Quest tracking
-local TSQuestState = {
-    Active = false,
-    CurrentPart = 1,  -- 1=Handle, 2=Thruster, 3=Base
-    Part1Completed = false,
-    Part2Completed = false,
-    Part3Completed = false,
-    TowersBuilt = 0,
-    CarriageEscorted = false,
-    IceBurstStones = 0,
-    SupplyCratesFound = 0,
-    SupplyCratesDefended = false,
-    CurrentMissionStarted = false
+-- Quest tracking
+local GiantForestState = {
+    CratesCollected = 0,
+    DefenseComplete = false,
+    TotalCrates = 3
 }
 
 -- Check if Thunderspears are already unlocked
 local function HasThunderspears()
     local pData = GetPlayerData()
     if not pData or not pData.Slots then return false end
-    
     local slotIdx = lp:GetAttribute("Slot")
     if not slotIdx or not pData.Slots[slotIdx] then return false end
-    
     return pData.Slots[slotIdx].Weapon == "Spears"
 end
 
--- Reset quest state
-local function ResetTSQuestState()
-    TSQuestState = {
-        Active = false,
-        CurrentPart = 1,
-        Part1Completed = false,
-        Part2Completed = false,
-        Part3Completed = false,
-        TowersBuilt = 0,
-        CarriageEscorted = false,
-        IceBurstStones = 0,
-        SupplyCratesFound = 0,
-        SupplyCratesDefended = false,
-        CurrentMissionStarted = false
+-- Reset state
+local function ResetGiantForestState()
+    GiantForestState = {
+        CratesCollected = 0,
+        DefenseComplete = false,
+        TotalCrates = 3
     }
 end
 
--- Get current map name from workspace
-local function GetCurrentMap()
-    -- Try multiple ways to get map name
-    local mapName = workspace:GetAttribute("Map")
-    if mapName then return mapName end
-    
-    -- Check from mapData
-    if mapData and mapData.Map and mapData.Map.Name then
-        return mapData.Map.Name
-    end
-    
-    -- Check from workspace children
-    local mapIndicators = {
-        ["Outskirts"] = "Outskirts",
-        ["Utgard"] = "Utgard",
-        ["Giant Forest"] = "GiantForest",
-        ["GiantForest"] = "Giant Forest",
-        ["Trost"] = "Trost",
-        ["Shiganshina"] = "Shiganshina",
-        ["Stohess"] = "Stohess"
-    }
-    
-    for indicator, name in pairs(mapIndicators) do
-        if workspace:FindFirstChild(indicator) or string.find(workspace.Name or "", indicator) then
-            return name
+-- Find supply crates
+local function FindSupplyCrates()
+    local crates = {}
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        -- Look for crate parts
+        if obj:IsA("BasePart") and (string.find(obj.Name, "Crate") or string.find(obj.Name, "Supply")) then
+            local parent = obj.Parent
+            -- Check if not already collected
+            if parent and not parent:GetAttribute("Collected") and not obj:GetAttribute("Collected") then
+                table.insert(crates, obj)
+            end
+        end
+        -- Also check for Interact objects
+        if obj.Name == "Interact" and obj.Parent then
+            local parent = obj.Parent
+            if string.find(parent.Name, "Crate") or string.find(parent.Name, "Supply") then
+                if not parent:GetAttribute("Collected") then
+                    table.insert(crates, obj.Parent)
+                end
+            end
         end
     end
-    
-    return nil
+    return crates
 end
 
--- ==========================================
--- PART 1: OUTSKIRTS - Handle Quest
--- ==========================================
-local function CompleteOutskirtsQuest()
-    UpdateStatus("TS Quest: Outskirts - Building Towers & Escorting Carriage")
+-- Collect a crate
+local function CollectCrate(crate)
+    local root = lp.Character and lp.Character:FindFirstChild("HumanoidRootPart")
+    if not root then return false end
     
-    -- Find tower build circles
-    local function FindTowerCircles()
-        local circles = {}
-        for _, obj in ipairs(workspace:GetDescendants()) do
-            if obj:IsA("Part") and obj.Name == "Build" and obj.Parent and obj.Parent.Name == "Interact" then
-                if not obj.Parent:GetAttribute("Built") then
-                    table.insert(circles, obj)
-                end
-            end
-        end
-        return circles
-    end
+    -- Get crate position
+    local cratePos = crate:FindFirstChild("HumanoidRootPart") and crate.HumanoidRootPart.Position or crate.Position
     
-    -- Build towers
-    if TSQuestState.TowersBuilt < 3 then
-        local circles = FindTowerCircles()
-        for _, circle in ipairs(circles) do
-            local root = lp.Character and lp.Character:FindFirstChild("HumanoidRootPart")
-            if root then
-                local dist = (root.Position - circle.Position).Magnitude
-                if dist < 10 then
-                    -- Stand in circle to build
-                    postRemote:FireServer("Interact", "Build", circle)
-                    task.wait(2)
-                    TSQuestState.TowersBuilt = TSQuestState.TowersBuilt + 1
-                    Library:Notify({
-                        Title = "TS Quest",
-                        Description = "✅ Tower " .. TSQuestState.TowersBuilt .. "/3 built",
-                        Time = 2
-                    })
-                else
-                    -- Move to circle
-                    root.CFrame = CFrame.new(circle.Position + Vector3.new(0, 5, 0))
-                    task.wait(0.5)
-                end
-            end
-        end
+    -- Move to crate
+    if (root.Position - cratePos).Magnitude > 10 then
+        root.CFrame = CFrame.new(cratePos + Vector3.new(0, 5, 0))
+        task.wait(0.5)
         return false
     end
     
-    -- Escort carriage
-    if not TSQuestState.CarriageEscorted then
-        -- Find carriage
-        local carriage = workspace:FindFirstChild("Carriage")
-        if not carriage then
-            for _, obj in ipairs(workspace:GetDescendants()) do
-                if obj.Name == "Carriage" and obj:IsA("Model") then
-                    carriage = obj
-                    break
-                end
-            end
-        end
-        
-        if carriage then
-            local root = lp.Character and lp.Character:FindFirstChild("HumanoidRootPart")
-            if root then
-                local carriagePos = carriage:FindFirstChild("HumanoidRootPart") 
-                    and carriage.HumanoidRootPart.Position 
-                    or carriage.Position
-                
-                -- Stay near carriage (10-20 studs behind/above)
-                root.CFrame = CFrame.new(carriagePos + Vector3.new(0, 15, -20))
-                
-                -- Check if escort complete
-                local objectiveComplete = workspace:GetAttribute("Objective_Complete") 
-                    or workspace:GetAttribute("Escort_Complete")
-                    or (workspace:GetAttribute("Seconds") and workspace:GetAttribute("Seconds") >= 90)
-                
-                if objectiveComplete then
-                    TSQuestState.CarriageEscorted = true
-                    Library:Notify({
-                        Title = "TS Quest",
-                        Description = "✅ Carriage escorted! Part 1 Complete!",
-                        Time = 3
-                    })
-                    return true
-                end
-            end
-        end
-        return false
+    -- Interact with crate
+    local interact = crate:FindFirstChild("Interact")
+    if interact then
+        postRemote:FireServer("Interact", "Collect", crate)
+        task.wait(1)
+        crate:SetAttribute("Collected", true)
+        return true
     end
     
-    return true -- Part 1 complete
+    return false
 end
 
--- ==========================================
--- PART 2: UTGARD - Thruster Quest
--- ==========================================
-local function CompleteUtgardQuest()
-    UpdateStatus("TS Quest: Utgard - Hunting Ice Burst Titans")
-    
-    local titansFolder = workspace:FindFirstChild("Titans")
-    if not titansFolder then return false end
-    
-    -- Find and kill Ice Burst Titans
-    local iceBurstTitans = {}
-    for _, titan in ipairs(titansFolder:GetChildren()) do
-        local name = titan.Name
-        local isIceBurst = name == "Ice_Burst_Titan" 
-            or name == "IceBurst" 
-            or (titan:GetAttribute("Type") == "IceBurst")
-            or (titan:GetAttribute("Name") == "Ice Burst")
-        
-        if isIceBurst and not titan:GetAttribute("Killed") and not titan:GetAttribute("Dead") then
-            table.insert(iceBurstTitans, titan)
-        end
-    end
-    
-    for _, titan in ipairs(iceBurstTitans) do
-        local hitbox = titan:FindFirstChild("Hitboxes") 
-            and titan.Hitboxes:FindFirstChild("Hit")
-        local nape = hitbox and hitbox:FindFirstChild("Nape")
-        
-        if nape then
-            local root = lp.Character and lp.Character:FindFirstChild("HumanoidRootPart")
-            if root then
-                -- Position behind nape
-                local attackPos = nape.Position + (nape.CFrame.LookVector * -15) + Vector3.new(0, 10, 0)
-                root.CFrame = CFrame.new(attackPos)
-                task.wait(0.1)
-                
-                -- Attack nape (need 3 quick hits for Ice Burst Titans)
-                for i = 1, 3 do
-                    postRemote:FireServer("Attacks", "Slash", true)
-                    postRemote:FireServer("Hitboxes", "Register", nape, math.random(625, 850))
-                    task.wait(0.2)
-                end
-                
-                task.wait(1)
-                
-                -- Check if titan died
-                if titan:GetAttribute("Killed") or titan:GetAttribute("Dead") or not titan.Parent then
-                    TSQuestState.IceBurstStones = TSQuestState.IceBurstStones + 1
-                    Library:Notify({
-                        Title = "TS Quest",
-                        Description = "💎 Ice Burst Stone " .. TSQuestState.IceBurstStones .. "/3 collected",
-                        Time = 2
-                    })
-                end
-            end
-        end
-    end
-    
-    return TSQuestState.IceBurstStones >= 3
-end
-
--- ==========================================
--- PART 3: GIANT FOREST - Base Quest
--- ==========================================
-local function CompleteGiantForestQuest()
-    UpdateStatus("TS Quest: Giant Forest - Collecting & Defending Crates")
-    
-    -- Find supply crates
-    local function FindSupplyCrates()
-        local crates = {}
-        for _, obj in ipairs(workspace:GetDescendants()) do
-            if obj:IsA("Part") and (obj.Name == "SupplyCrate" or obj.Name == "Crate") then
-                local interacted = obj:FindFirstChild("Interact") or obj.Parent and obj.Parent:FindFirstChild("Interact")
-                if interacted and not obj:GetAttribute("Collected") then
-                    table.insert(crates, obj)
-                end
-            end
-        end
-        return crates
-    end
-    
-    -- Collect crates
-    if TSQuestState.SupplyCratesFound < 3 then
-        local crates = FindSupplyCrates()
-        for _, crate in ipairs(crates) do
-            local root = lp.Character and lp.Character:FindFirstChild("HumanoidRootPart")
-            if root then
-                local dist = (root.Position - crate.Position).Magnitude
-                if dist < 8 then
-                    -- Interact with crate
-                    local interact = crate:FindFirstChild("Interact") or crate.Parent and crate.Parent:FindFirstChild("Interact")
-                    if interact then
-                        postRemote:FireServer("Interact", "Collect", crate)
-                        task.wait(1)
-                        TSQuestState.SupplyCratesFound = TSQuestState.SupplyCratesFound + 1
-                        crate:SetAttribute("Collected", true)
-                        Library:Notify({
-                            Title = "TS Quest",
-                            Description = "📦 Supply crate " .. TSQuestState.SupplyCratesFound .. "/3 collected",
-                            Time = 2
-                        })
-                    end
-                else
-                    root.CFrame = CFrame.new(crate.Position + Vector3.new(0, 5, 0))
-                    task.wait(0.3)
-                end
-            end
-        end
-        return false
-    end
-    
-    -- Defend crates (stay near defense point and kill titans)
-    if not TSQuestState.SupplyCratesDefended then
-        -- Find defense area
-        local defensePoint = workspace:FindFirstChild("DefensePoint")
-        if not defensePoint then
-            for _, obj in ipairs(workspace:GetDescendants()) do
-                if obj.Name == "DefensePoint" or obj.Name == "DefendArea" then
-                    defensePoint = obj
-                    break
-                end
-            end
-        end
-        
-        if defensePoint then
-            local root = lp.Character and lp.Character:FindFirstChild("HumanoidRootPart")
-            if root then
-                local defendPos = defensePoint:FindFirstChild("Position") 
-                    and defensePoint.Position.Value 
-                    or defensePoint.Position
-                
-                -- Stay in defense area
-                root.CFrame = CFrame.new(defendPos + Vector3.new(0, 15, 0))
-                
-                -- Let auto farm handle titan killing
-                if not AutoFarm._running then
-                    AutoFarm:Start()
-                end
-            end
-        end
-        
-        -- Check defense complete
-        local defenseComplete = workspace:GetAttribute("Defense_Complete") 
-            or workspace:GetAttribute("Objective_Complete")
-            or (workspace:GetAttribute("Seconds") and workspace:GetAttribute("Seconds") >= 60)
-        
-        if defenseComplete then
-            TSQuestState.SupplyCratesDefended = true
-            Library:Notify({
-                Title = "TS Quest",
-                Description = "✅ Crates defended! Part 3 Complete!",
-                Time = 3
-            })
-            return true
-        end
-        return false
-    end
-    
-    return true
-end
-
--- ==========================================
--- MAIN AUTO DETECTION LOOP
--- ==========================================
-local function AutoCompleteTSQuest()
-    if not getgenv().AutoTSQuest then return end
+-- Main Giant Forest quest function
+local function AutoGiantForestQuest()
+    if not getgenv().AutoGiantForestQuest then return end
     
     -- Check if already have Thunderspears
     if HasThunderspears() then
         Library:Notify({
             Title = "TS Quest",
-            Description = "🎯 Thunderspears already unlocked! Disabling auto quest.",
+            Description = "Thunderspears already unlocked!",
             Time = 3
         })
-        getgenv().AutoTSQuest = false
-        if Library.Toggles.AutoTSQuestToggle then
-            Library.Toggles.AutoTSQuestToggle:SetValue(false)
+        getgenv().AutoGiantForestQuest = false
+        if Library.Toggles.AutoGiantForestToggle then
+            Library.Toggles.AutoGiantForestToggle:SetValue(false)
         end
         return
     end
     
-    -- Check if in lobby
-    if isLobby then
-        UpdateStatus("TS Quest: In lobby - waiting for mission...")
+    -- Check if in Giant Forest map
+    local currentMap = workspace:GetAttribute("Map") or (mapData and mapData.Map and mapData.Map.Name)
+    if currentMap ~= "Giant Forest" and currentMap ~= "GiantForest" then
+        UpdateStatus("Giant Forest Quest: Wrong map (need Giant Forest)")
         task.wait(2)
         return
     end
@@ -2541,154 +2292,177 @@ local function AutoCompleteTSQuest()
         return
     end
     
-    -- Ensure auto farm is running for combat
+    -- Enable auto farm for combat
     if not AutoFarm._running then
         AutoFarm:Start()
     end
     
-    -- Get current map
-    local currentMap = GetCurrentMap()
-    if not currentMap then
-        UpdateStatus("TS Quest: Detecting map...")
-        task.wait(1)
+    UpdateStatus("Giant Forest: Collecting crates...")
+    
+    -- Part 1: Collect 3 supply crates
+    if GiantForestState.CratesCollected < GiantForestState.TotalCrates then
+        local crates = FindSupplyCrates()
+        
+        for _, crate in ipairs(crates) do
+            if CollectCrate(crate) then
+                GiantForestState.CratesCollected = GiantForestState.CratesCollected + 1
+                Library:Notify({
+                    Title = "TS Quest",
+                    Description = string.format("📦 Crate %d/%d collected", GiantForestState.CratesCollected, GiantForestState.TotalCrates),
+                    Time = 2
+                })
+                SaveTSQuestProgress()
+                task.wait(1)
+            end
+        end
+        
+        -- If all crates collected
+        if GiantForestState.CratesCollected >= GiantForestState.TotalCrates then
+            Library:Notify({
+                Title = "TS Quest",
+                Description = "✅ All crates collected! Now defending...",
+                Time = 3
+            })
+        end
         return
     end
     
-    -- AUTO DETECT AND COMPLETE BASED ON MAP
-    local questComplete = false
-    
-    if currentMap == "Outskirts" and not TSQuestState.Part1Completed then
-        TSQuestState.CurrentPart = 1
-        questComplete = CompleteOutskirtsQuest()
-        if questComplete then
-            TSQuestState.Part1Completed = true
-            TSQuestState.CurrentPart = 2
-            -- Auto return to lobby to queue next map
-            Library:Notify({
-                Title = "TS Quest",
-                Description = "✅ Part 1 Complete! Returning to lobby...",
-                Time = 3
-            })
-            task.wait(2)
-            getRemote:InvokeServer("Functions", "Teleport", "Lobby")
+    -- Part 2: Defend crates
+    if not GiantForestState.DefenseComplete then
+        UpdateStatus("Giant Forest: Defending crates...")
+        
+        -- Find defense area
+        local defensePoint = nil
+        for _, obj in ipairs(workspace:GetDescendants()) do
+            if obj.Name == "DefensePoint" or obj.Name == "DefendArea" or (obj:IsA("Part") and string.find(obj.Name, "Defend")) then
+                defensePoint = obj
+                break
+            end
         end
         
-    elseif currentMap == "Utgard" and TSQuestState.Part1Completed and not TSQuestState.Part2Completed then
-        TSQuestState.CurrentPart = 2
-        questComplete = CompleteUtgardQuest()
-        if questComplete then
-            TSQuestState.Part2Completed = true
-            TSQuestState.CurrentPart = 3
-            Library:Notify({
-                Title = "TS Quest",
-                Description = "✅ Part 2 Complete! Returning to lobby...",
-                Time = 3
-            })
-            task.wait(2)
-            getRemote:InvokeServer("Functions", "Teleport", "Lobby")
+        -- Stay in defense area
+        local root = lp.Character and lp.Character:FindFirstChild("HumanoidRootPart")
+        if root and defensePoint then
+            local defendPos = defensePoint.Position
+            if (root.Position - defendPos).Magnitude > 30 then
+                root.CFrame = CFrame.new(defendPos + Vector3.new(0, 15, 0))
+            end
         end
         
-    elseif currentMap == "Giant Forest" and TSQuestState.Part1Completed and TSQuestState.Part2Completed and not TSQuestState.Part3Completed then
-        TSQuestState.CurrentPart = 3
-        questComplete = CompleteGiantForestQuest()
-        if questComplete then
-            TSQuestState.Part3Completed = true
+        -- Check if defense is complete
+        local objectiveComplete = workspace:GetAttribute("Objective_Complete") 
+            or workspace:GetAttribute("Defense_Complete")
+            or (workspace:GetAttribute("Seconds") and workspace:GetAttribute("Seconds") >= 60)
+        
+        -- Also check UI objective
+        local objectiveText = GetCurrentObjective()
+        if objectiveText and (string.find(objectiveText, "Defend") or string.find(objectiveText, "Protect")) then
+            if workspace:GetAttribute("Seconds") and workspace:GetAttribute("Seconds") <= 0 then
+                objectiveComplete = true
+            end
+        end
+        
+        if objectiveComplete then
+            GiantForestState.DefenseComplete = true
             Library:Notify({
                 Title = "TS Quest",
                 Description = "🎉 THUNDERSPEARS UNLOCKED! 🎉",
                 Time = 5
             })
-            getgenv().AutoTSQuest = false
-            if Library.Toggles.AutoTSQuestToggle then
-                Library.Toggles.AutoTSQuestToggle:SetValue(false)
+            SaveTSQuestProgress()
+            getgenv().AutoGiantForestQuest = false
+            if Library.Toggles.AutoGiantForestToggle then
+                Library.Toggles.AutoGiantForestToggle:SetValue(false)
             end
         end
     end
 end
 
--- Start the auto detection loop
+-- Start the loop
 task.spawn(function()
     while true do
-        pcall(AutoCompleteTSQuest)
-        task.wait(2)
+        pcall(AutoGiantForestQuest)
+        task.wait(1)
+    end
+end)
+
+-- Save progress periodically
+task.spawn(function()
+    while true do
+        task.wait(30)
+        if getgenv().AutoGiantForestQuest then
+            SaveTSQuestProgress()
+        end
     end
 end)
 
 -- ==========================================
--- ADD UI ELEMENTS
+-- UI BUTTONS
 -- ==========================================
 
 -- Add to Main tab
-local TSQuestGroup = Tabs.Main:AddLeftGroupbox("⚡ Thunderspear Quest")
+local GiantForestGroup = Tabs.Main:AddLeftGroupbox("🌲 Giant Forest TS Quest")
 
-TSQuestGroup:AddToggle("AutoTSQuestToggle", {
-    Text = "Auto Complete TS Quest",
+GiantForestGroup:AddToggle("AutoGiantForestToggle", {
+    Text = "Auto Complete Giant Forest (Part 3)",
     Default = false,
 })
-Toggles.AutoTSQuestToggle:OnChanged(function()
-    getgenv().AutoTSQuest = Toggles.AutoTSQuestToggle.Value
-    if getgenv().AutoTSQuest then
-        ResetTSQuestState()
-        -- Auto enable auto farm
+Toggles.AutoGiantForestToggle:OnChanged(function()
+    getgenv().AutoGiantForestQuest = Toggles.AutoGiantForestToggle.Value
+    if getgenv().AutoGiantForestQuest then
+        ResetGiantForestState()
         if not Toggles.AutoKillToggle.Value then
             Toggles.AutoKillToggle:SetValue(true)
         end
         Library:Notify({
             Title = "TS Quest",
-            Description = "🚀 Auto TS Quest Started! Will auto-detect maps and complete all parts!",
-            Time = 5
+            Description = "Auto Giant Forest Quest Started! Will collect 3 crates and defend.",
+            Time = 4
         })
     end
 end)
 
-TSQuestGroup:AddButton({
+GiantForestGroup:AddButton({
     Text = "Reset Progress",
     Func = function()
-        ResetTSQuestState()
+        ResetGiantForestState()
+        SaveTSQuestProgress()
         Library:Notify({
             Title = "TS Quest",
-            Description = "🔄 Quest progress reset!",
-            Time = 3
+            Description = "Progress reset!",
+            Time = 2
         })
     end,
 })
 
 -- Status label
-local TSStatusLabel = TSQuestGroup:AddLabel("📌 Status: Waiting...")
+local GFStatusLabel = GiantForestGroup:AddLabel("Status: Waiting...")
 
--- Update status label
 task.spawn(function()
     while true do
-        if getgenv().AutoTSQuest then
-            local status = ""
+        if getgenv().AutoGiantForestQuest then
             if HasThunderspears() then
-                status = "✅ Thunderspears UNLOCKED!"
-            elseif TSQuestState.Part3Completed then
-                status = "✅ All parts complete!"
-            elseif TSQuestState.CurrentPart == 1 then
-                status = "📍 Part 1 (Outskirts): Towers " .. TSQuestState.TowersBuilt .. "/3 | Carriage " .. (TSQuestState.CarriageEscorted and "✓" or "✗")
-            elseif TSQuestState.CurrentPart == 2 then
-                status = "📍 Part 2 (Utgard): Stones " .. TSQuestState.IceBurstStones .. "/3"
-            elseif TSQuestState.CurrentPart == 3 then
-                status = "📍 Part 3 (Giant Forest): Crates " .. TSQuestState.SupplyCratesFound .. "/3 | Defend " .. (TSQuestState.SupplyCratesDefended and "✓" or "✗")
+                GFStatusLabel:SetText("✅ Thunderspears UNLOCKED!")
+            elseif GiantForestState.DefenseComplete then
+                GFStatusLabel:SetText("✅ Complete! Thunderspears unlocked!")
+            elseif GiantForestState.CratesCollected < 3 then
+                GFStatusLabel:SetText(string.format("📦 Collecting crates: %d/3", GiantForestState.CratesCollected))
             else
-                status = "📍 Waiting for correct map..."
+                GFStatusLabel:SetText("🛡️ Defending crates...")
             end
-            TSStatusLabel:SetText("📌 " .. status)
         else
-            TSStatusLabel:SetText("📌 Status: Disabled")
+            GFStatusLabel:SetText("⚙️ Disabled")
         end
         task.wait(1)
     end
 end)
 
-TSQuestGroup:AddLabel("━━━━━━━━━━━━━━━━━━━━")
-TSQuestGroup:AddLabel("🎯 Auto detects which map you're in")
-TSQuestGroup:AddLabel("📍 Outskirts → Build towers + Escort")
-TSQuestGroup:AddLabel("📍 Utgard → Kill Ice Burst Titans")
-TSQuestGroup:AddLabel("📍 Giant Forest → Collect + Defend crates")
-TSQuestGroup:AddLabel("⚡ Auto Farm must be enabled")
-Library:OnUnload(function()
+GiantForestGroup:AddLabel("━━━━━━━━━━━━━━━━━━━━")
+GiantForestGroup:AddLabel("📍 Must be in GIANT FOREST map")
+GiantForestGroup:AddLabel("1. Collects 3 supply crates")
+GiantForestGroup:AddLabel("2. Defends crates from titans")
+GiantForestGroup:AddLabel("⚠️ Auto Farm must be ON")
+
 	Library.Unloaded = true
 end)
 
