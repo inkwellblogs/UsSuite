@@ -76,11 +76,11 @@ local familyRaritiesOptions = {
 }
 
 -- Config system for persistent dropdown state
-if not isfolder("./THUH") then makefolder("./THUB") end
-if not isfolder("./THUB/aotr") then makefolder("./THUB/aotr") end
+if not isfolder("./UsSuite") then makefolder("./UsSuite") end
+if not isfolder("./UsSuite/aotr") then makefolder("./UsSuite/aotr") end
 
-local ConfigFile = "./THUB/aotr/dropdown_config.json"
-local returnCounterPath = "./THUB/aotr/return_lobby_counter.txt"
+local ConfigFile = "./UsSuite/aotr/dropdown_config.json"
+local returnCounterPath = "./UsSuite/aotr/return_lobby_counter.txt"
 local HttpService = game:GetService("HttpService")
 
 local function LoadConfig()
@@ -192,7 +192,7 @@ function AutoFarm:Start()
 		while self._running and not checkReady() do
 			if os.clock() - startTime > 10 then -- Notify every 10s if still waiting
 				Library:Notify({
-					Title = "TITANIC HUB",
+					Title = "Tekkit Hub",
 					Description = "Still waiting for mission assets to load...",
 					Time = 5
 				})
@@ -620,7 +620,7 @@ local data = {
 	Special = {}
 }
 
-local path = "./THUB/aotr/games_played.txt"
+local path = "./UsSuite/aotr/games_played.txt"
 if not isfile(path) then writefile(path, "0") end
 local gamesPlayed = tonumber(readfile(path))
 
@@ -631,7 +631,7 @@ if rewards then
 		if not rewards.Visible then return end
 
 	gamesPlayed = gamesPlayed + 1
-		writefile("./THUB/aotr/games_played.txt", tostring(gamesPlayed))
+		writefile("./UsSuite/aotr/games_played.txt", tostring(gamesPlayed))
 
 		local gamesUntilReturn = tonumber(readfile(returnCounterPath)) or 0
 		local willReturn = false
@@ -729,7 +729,7 @@ if rewards then
 			local payload = {
 					content = hasSpecial and "MYTHICAL DROP! @everyone" or nil,
 					embeds = {{
-						title = "TH Rewards",
+						title = "Us Rewards",
 						color = hasSpecial and 0xff0000 or 0x2b2d31,
 
 
@@ -772,7 +772,7 @@ if rewards then
 						},
 
 						footer = {
-							text = "TITANIC HUB • " .. DateTime.now():FormatLocalTime("LTS", "en-us")
+							text = "Us Suite • " .. DateTime.now():FormatLocalTime("LTS", "en-us")
 						},
 
 						timestamp = DateTime.now():ToIsoDate()
@@ -1056,7 +1056,7 @@ local function roll(targets, rarities)
 						}
 					},
 					footer = {
-						text = "TITANIC HUB • " .. DateTime.now():FormatLocalTime("LTS", "en-us")
+						text = "Us Suite • " .. DateTime.now():FormatLocalTime("LTS", "en-us")
 					},
 					timestamp = DateTime.now():ToIsoDate()
 				}}
@@ -1072,7 +1072,7 @@ local function roll(targets, rarities)
 
 		pcall(function()
 			Library:Notify({
-				Title = "TITANIC HUB",
+				Title = "Tekkit Hub",
 				Description = "Target family rolled: " .. familyString,
 				Time = 5,
 			})
@@ -1205,36 +1205,57 @@ local SaveManager = loadstring(game:HttpGet(repo .. "addons/SaveManager.lua"))()
 local Options = Library.Options
 local Toggles = Library.Toggles
 
+-- ==========================================
+-- TEKKIT HUB STYLE WINDOW
+-- ==========================================
+
 local Window = Library:CreateWindow({
-	Title = "TITANIC HUB",
-	Footer = "AOT:R | Free",
+	Title = "Tekkit Hub",
+	Footer = "AOT:R  •  v2.0",
 	Center = true,
 	AutoShow = true,
 	Resizable = true,
 	ShowCustomCursor = true,
 })
 
+-- Sidebar sections mirroring Tekkit Hub layout:
+--   In-Game  → Farming | Settings
+--   Lobby    → Automation | Settings
+--   Main Menu → Automation | Settings
+
 local Tabs = {
-	Main = Window:AddTab("Main", "house"),
-	Upgrades = Window:AddTab("Upgrades", "trending-up"),
-	Misc = Window:AddTab("Misc", "boxes"),
-	Settings = Window:AddTab("Settings", "settings"),
+	-- In-Game section
+	InGame_Farming  = Window:AddTab("Farming",    "sword"),
+	InGame_Settings = Window:AddTab("In-Game Settings", "settings"),
+
+	-- Lobby section
+	Lobby_Auto      = Window:AddTab("Automation", "zap"),
+	Lobby_Settings  = Window:AddTab("Lobby Settings", "sliders"),
+
+	-- Main Menu section
+	Menu_Auto       = Window:AddTab("Main Menu Automation", "play"),
+	Menu_Settings   = Window:AddTab("Main Menu Settings", "wrench"),
 }
 
-local MainGroup = Tabs.Main:AddLeftGroupbox("Farm")
-local AutoStartGroup = Tabs.Main:AddRightGroupbox("Auto Start")
+-- ── In-Game › Farming ──────────────────────────────────────
+local MainGroup     = Tabs.InGame_Farming:AddLeftGroupbox("Farm")
+local AutoStartGroup = Tabs.InGame_Farming:AddRightGroupbox("Auto Start")
 
-local UpgradesGroup = Tabs.Upgrades:AddLeftGroupbox("Upgrades")
-local SkillTreeGroup = Tabs.Upgrades:AddRightGroupbox("Skill Tree")
+-- ── In-Game › Settings ─────────────────────────────────────
+local SettingsGroup = Tabs.InGame_Settings:AddLeftGroupbox("Settings")
+local WebhookGroup  = Tabs.InGame_Settings:AddRightGroupbox("Webhook")
 
-local SlotGroup = Tabs.Misc:AddLeftGroupbox("Slot")
-local FamilyRollGroup = Tabs.Misc:AddRightGroupbox("Family Roll")
+-- ── Lobby › Automation ─────────────────────────────────────
+local UpgradesGroup   = Tabs.Lobby_Auto:AddLeftGroupbox("Upgrades")
+local SkillTreeGroup  = Tabs.Lobby_Auto:AddRightGroupbox("Skill Tree")
 
-local SettingsGroup = Tabs.Misc:AddLeftGroupbox("Settings")
-local WebhookGroup = Tabs.Misc:AddRightGroupbox("Webhook")
+-- ── Lobby › Settings ───────────────────────────────────────
+local SlotGroup       = Tabs.Lobby_Settings:AddLeftGroupbox("Slot")
+local FamilyRollGroup = Tabs.Lobby_Settings:AddRightGroupbox("Family Roll")
 
 -- ==========================================
--- MAIN TAB : Farm Groupbox
+-- IN-GAME › FARMING TAB : Farm Groupbox
+-- (Tekkit Hub style — subtitle labels under each item)
 -- ==========================================
 getgenv().CurrentStatusLabel = MainGroup:AddLabel("Status: Idle")
 
@@ -1242,6 +1263,7 @@ MainGroup:AddToggle("AutoKillToggle", {
 	Text = "Auto Farm",
 	Default = false,
 })
+MainGroup:AddLabel("Automatically kills titans and collects rewards.", true)
 Toggles.AutoKillToggle:OnChanged(function()
 	if Toggles.AutoKillToggle.Value then AutoFarm:Start() else AutoFarm:Stop() end
 end)
@@ -1250,6 +1272,7 @@ MainGroup:AddToggle("MasteryFarmToggle", {
 	Text = "Titan Mastery Farm",
 	Default = false,
 })
+MainGroup:AddLabel("Farms titan mastery XP via punching or skills.", true)
 Toggles.MasteryFarmToggle:OnChanged(function()
 	getgenv().MasteryFarmConfig.Enabled = Toggles.MasteryFarmToggle.Value
 	if Toggles.MasteryFarmToggle.Value then
@@ -1267,6 +1290,7 @@ MainGroup:AddDropdown("MasteryModeDropdown", {
 	Multi = false,
 	Text = "Mastery Mode",
 })
+MainGroup:AddLabel("Choose how mastery XP is farmed.", true)
 Options.MasteryModeDropdown:OnChanged(function()
 	getgenv().MasteryFarmConfig.Mode = Options.MasteryModeDropdown.Value
 end)
@@ -1277,6 +1301,7 @@ MainGroup:AddDropdown("MovementModeDropdown", {
 	Multi = false,
 	Text = "Movement Mode",
 })
+MainGroup:AddLabel("How the bot moves toward titans.", true)
 Options.MovementModeDropdown:OnChanged(function()
 	getgenv().AutoFarmConfig.MovementMode = Options.MovementModeDropdown.Value
 end)
@@ -1287,6 +1312,7 @@ MainGroup:AddDropdown("FarmOptionsDropdown", {
 	Multi = true,
 	Text = "Farm Options",
 })
+MainGroup:AddLabel("Extra options applied during farming.", true)
 Options.FarmOptionsDropdown:OnChanged(function()
 	local vals = Options.FarmOptionsDropdown.Value
 	getgenv().AutoFailsafe = vals["Failsafe"] or false
@@ -1302,28 +1328,28 @@ MainGroup:AddSlider("HoverSpeedSlider", {
 	Max = 500,
 	Rounding = 0,
 })
+MainGroup:AddLabel("Speed at which the bot hovers to titans.", true)
 Options.HoverSpeedSlider:OnChanged(function()
 	getgenv().AutoFarmConfig.MoveSpeed = Options.HoverSpeedSlider.Value
 end)
 
-
 MainGroup:AddSlider("FloatHeightSlider", {
-
 	Text = "Float Height",
 	Default = 250,
 	Min = 100,
 	Max = 300,
 	Rounding = 0,
 })
+MainGroup:AddLabel("Height above ground while hovering.", true)
 Options.FloatHeightSlider:OnChanged(function()
 	getgenv().AutoFarmConfig.HeightOffset = Options.FloatHeightSlider.Value
 end)
 
-
 MainGroup:AddToggle("AutoReloadToggle", {
-	Text = "Auto Reload/Refill",
+	Text = "Auto Reload / Refill",
 	Default = false,
 })
+MainGroup:AddLabel("Automatically reloads blades and refills gas.", true)
 Toggles.AutoReloadToggle:OnChanged(function()
 	autoReloadEnabled = Toggles.AutoReloadToggle.Value
 	autoRefillEnabled = Toggles.AutoReloadToggle.Value
@@ -1333,6 +1359,7 @@ MainGroup:AddToggle("AutoEscapeToggle", {
 	Text = "Auto Escape",
 	Default = false,
 })
+MainGroup:AddLabel("Escapes titan grabs automatically.", true)
 Toggles.AutoEscapeToggle:OnChanged(function()
 	getgenv().AutoEscape = Toggles.AutoEscapeToggle.Value
 end)
@@ -1341,6 +1368,7 @@ MainGroup:AddToggle("AutoSkipToggle", {
 	Text = "Auto Skip Cutscenes",
 	Default = false,
 })
+MainGroup:AddLabel("Skips mission cutscenes to save time.", true)
 Toggles.AutoSkipToggle:OnChanged(function()
 	getgenv().AutoSkip = Toggles.AutoSkipToggle.Value
 	if getgenv().AutoSkip then ExecuteImmediateAutomation() end
@@ -1350,6 +1378,7 @@ MainGroup:AddToggle("AutoRetryToggle", {
 	Text = "Auto Retry",
 	Default = false,
 })
+MainGroup:AddLabel("Retries the mission after completion or failure.", true)
 Toggles.AutoRetryToggle:OnChanged(function()
 	getgenv().AutoRetry = Toggles.AutoRetryToggle.Value
 	if getgenv().AutoRetry then ExecuteImmediateAutomation() end
@@ -1359,6 +1388,7 @@ MainGroup:AddToggle("AutoChestToggle", {
 	Text = "Auto Open Chests",
 	Default = false,
 })
+MainGroup:AddLabel("Automatically opens chests at end of mission.", true)
 Toggles.AutoChestToggle:OnChanged(function()
 	getgenv().AutoChest = Toggles.AutoChestToggle.Value
 	if getgenv().AutoChest then ExecuteImmediateAutomation() end
@@ -1368,12 +1398,14 @@ MainGroup:AddToggle("DeleteMapToggle", {
 	Text = "Delete Map (FPS Boost)",
 	Default = DropdownConfig.DeleteMap or false,
 })
+MainGroup:AddLabel("Removes map geometry for better performance.", true)
 Toggles.DeleteMapToggle:OnChanged(function()
 	getgenv().DeleteMap = Toggles.DeleteMapToggle.Value
 	DropdownConfig.DeleteMap = getgenv().DeleteMap
 	SaveConfig(DropdownConfig)
 	if getgenv().DeleteMap then DeleteMap() end
 end)
+
 MainGroup:AddToggle("SoloOnlyToggle", {
 	Text = "Solo Only",
 	Default = false,
@@ -1381,11 +1413,13 @@ MainGroup:AddToggle("SoloOnlyToggle", {
 Toggles.SoloOnlyToggle:OnChanged(function()
 	getgenv().SoloOnly = Toggles.SoloOnlyToggle.Value
 end)
+MainGroup:AddLabel("Only farms when no other players are present.", true)
 
 MainGroup:AddToggle("AutoReturnLobbyToggle", {
 	Text = "Auto Return to Lobby",
 	Default = false,
 })
+MainGroup:AddLabel("Returns to lobby after timeout or mission end.", true)
 Toggles.AutoReturnLobbyToggle:OnChanged(function()
 	getgenv().AutoReturnLobby = Toggles.AutoReturnLobbyToggle.Value
 	if not getgenv().AutoReturnLobby then
@@ -1393,10 +1427,8 @@ Toggles.AutoReturnLobbyToggle:OnChanged(function()
 	end
 end)
 
-MainGroup:AddLabel("Failsafe tps you back to lobby\nafter a timeout.")
-
 -- ==========================================
--- MAIN TAB : Auto Start Groupbox
+-- IN-GAME › FARMING TAB : Auto Start Groupbox
 -- ==========================================
 
 AutoStartGroup:AddButton({
@@ -1406,6 +1438,7 @@ AutoStartGroup:AddButton({
 		TeleportService:Teleport(14916516914, lp)
 	end,
 })
+AutoStartGroup:AddLabel("Teleports you back to the main lobby.", true)
 
 AutoStartGroup:AddButton({
 	Text = "Join Discord",
@@ -1418,11 +1451,13 @@ AutoStartGroup:AddButton({
 		})
 	end,
 })
+AutoStartGroup:AddLabel("Copies the community Discord invite link.", true)
 
 AutoStartGroup:AddToggle("AutoStartToggle", {
 	Text = "Auto Start",
 	Default = false,
 })
+AutoStartGroup:AddLabel("Automatically creates and starts missions.", true)
 Toggles.AutoStartToggle:OnChanged(function()
 	getgenv().AutoStart = Toggles.AutoStartToggle.Value
 
@@ -1560,6 +1595,7 @@ AutoStartGroup:AddDropdown("StartTypeDropdown", {
 	Multi = false,
 	Text = "Type",
 })
+AutoStartGroup:AddLabel("Choose between Missions or Raids.", true)
 Options.StartTypeDropdown:OnChanged(function()
 	local Value = Options.StartTypeDropdown.Value
 	if not Value then return end
@@ -1583,6 +1619,7 @@ AutoStartGroup:AddDropdown("MissionMapDropdown", {
 	Multi = false,
 	Text = "Mission Map",
 })
+AutoStartGroup:AddLabel("The map your mission will take place on.", true)
 Options.MissionMapDropdown:OnChanged(function()
 	local Value = Options.MissionMapDropdown.Value
 	if not Value then return end
@@ -1605,6 +1642,7 @@ AutoStartGroup:AddDropdown("MissionObjectiveDropdown", {
 	Multi = false,
 	Text = "Mission Objective",
 })
+AutoStartGroup:AddLabel("The objective type for your mission.", true)
 Options.MissionObjectiveDropdown:OnChanged(function()
 	local Value = Options.MissionObjectiveDropdown.Value
 	DropdownConfig.Missions = DropdownConfig.Missions or {}
@@ -1618,6 +1656,7 @@ AutoStartGroup:AddDropdown("MissionDifficultyDropdown", {
 	Multi = false,
 	Text = "Mission Difficulty",
 })
+AutoStartGroup:AddLabel("Hardest tries all difficulties until one works.", true)
 Options.MissionDifficultyDropdown:OnChanged(function()
 	local Value = Options.MissionDifficultyDropdown.Value
 	DropdownConfig.Missions = DropdownConfig.Missions or {}
@@ -1633,6 +1672,7 @@ AutoStartGroup:AddDropdown("RaidMapDropdown", {
 	Multi = false,
 	Text = "Raid Map",
 })
+AutoStartGroup:AddLabel("Trost: Attack  •  Shiganshina: Armored  •  Stohess: Female", true)
 Options.RaidMapDropdown:OnChanged(function()
 	local Value = Options.RaidMapDropdown.Value
 	if not Value then return end
@@ -1655,6 +1695,7 @@ AutoStartGroup:AddDropdown("RaidObjectiveDropdown", {
 	Multi = false,
 	Text = "Raid Objective",
 })
+AutoStartGroup:AddLabel("The objective for the selected raid map.", true)
 Options.RaidObjectiveDropdown:OnChanged(function()
 	local Value = Options.RaidObjectiveDropdown.Value
 	DropdownConfig.Raids = DropdownConfig.Raids or {}
@@ -1668,14 +1709,13 @@ AutoStartGroup:AddDropdown("RaidDifficultyDropdown", {
 	Multi = false,
 	Text = "Raid Difficulty",
 })
+AutoStartGroup:AddLabel("Hardest tries all raid difficulties descending.", true)
 Options.RaidDifficultyDropdown:OnChanged(function()
 	local Value = Options.RaidDifficultyDropdown.Value
 	DropdownConfig.Raids = DropdownConfig.Raids or {}
 	DropdownConfig.Raids.difficulty = Value
 	SaveConfig(DropdownConfig)
 end)
-
-AutoStartGroup:AddLabel("Trost: Attack Titan\nShiganshina: Armored Titan\nStohess: Female Titan", true)
 
 AutoStartGroup:AddDivider()
 
@@ -1685,6 +1725,7 @@ AutoStartGroup:AddDropdown("ModifiersDropdown", {
 	Multi = true,
 	Text = "Modifiers",
 })
+AutoStartGroup:AddLabel("Optional challenge modifiers applied at mission start.", true)
 
 -- Trigger type initialization
 task.defer(function()
@@ -1694,13 +1735,14 @@ task.defer(function()
 end)
 
 -- ==========================================
--- UPGRADES TAB : Upgrades Groupbox
+-- LOBBY › AUTOMATION TAB : Upgrades Groupbox
 -- ==========================================
 
 UpgradesGroup:AddToggle("AutoUpgradeToggle", {
 	Text = "Upgrade Gear",
 	Default = false,
 })
+UpgradesGroup:AddLabel("Automatically upgrades your gear with Gold.", true)
 Toggles.AutoUpgradeToggle:OnChanged(function()
 	getgenv().AutoUpgrade = Toggles.AutoUpgradeToggle.Value
 	if getgenv().AutoUpgrade then
@@ -1736,6 +1778,7 @@ UpgradesGroup:AddToggle("AutoEnhanceToggle", {
 	Text = "Enhance Perks",
 	Default = false,
 })
+UpgradesGroup:AddLabel("Feeds lower-rarity perks into your equipped perk.", true)
 Toggles.AutoEnhanceToggle:OnChanged(function()
 	getgenv().AutoPerk = Toggles.AutoEnhanceToggle.Value
 	if getgenv().AutoPerk then
@@ -1845,24 +1888,25 @@ UpgradesGroup:AddDropdown("PerkSlotDropdown", {
 	Multi = false,
 	Text = "Perk Slot",
 })
+UpgradesGroup:AddLabel("The equipped perk slot to enhance. Default: Body.", true)
 
 UpgradesGroup:AddDropdown("SelectPerksDropdown", {
 	Values = {"Common", "Rare", "Epic", "Legendary"},
 	Default = {},
 	Multi = true,
-	Text = "Perks to use (Food)",
+	Text = "Perks to use as Food",
 })
-
-UpgradesGroup:AddLabel("Default perk slot is Body")
+UpgradesGroup:AddLabel("Rarities of perks to sacrifice as enhancement food.", true)
 
 -- ==========================================
--- UPGRADES TAB : Skill Tree Groupbox
+-- LOBBY › AUTOMATION TAB : Skill Tree Groupbox
 -- ==========================================
 
 SkillTreeGroup:AddToggle("AutoSkillTree", {
 	Text = "Auto Skill Tree",
 	Default = false,
 })
+SkillTreeGroup:AddLabel("Automatically unlocks skill tree nodes in priority order.", true)
 Toggles.AutoSkillTree:OnChanged(function()
 	getgenv().AutoSkillTree = Toggles.AutoSkillTree.Value
 	local plrData = GetPlayerData()
@@ -1930,6 +1974,7 @@ SkillTreeGroup:AddDropdown("MiddlePathDropdown", {
 	Multi = false,
 	Text = "Middle Path",
 })
+SkillTreeGroup:AddLabel("Weapon-specific offensive skill path.", true)
 
 SkillTreeGroup:AddDropdown("LeftPathDropdown", {
 	Values = {"Regen", "Cooldown Reduction"},
@@ -1937,6 +1982,7 @@ SkillTreeGroup:AddDropdown("LeftPathDropdown", {
 	Multi = false,
 	Text = "Left Path",
 })
+SkillTreeGroup:AddLabel("Support path for sustain or cooldowns.", true)
 
 SkillTreeGroup:AddDropdown("RightPathDropdown", {
 	Values = {"Health", "Damage Reduction"},
@@ -1944,6 +1990,7 @@ SkillTreeGroup:AddDropdown("RightPathDropdown", {
 	Multi = false,
 	Text = "Right Path",
 })
+SkillTreeGroup:AddLabel("Defense path for survivability.", true)
 
 SkillTreeGroup:AddDropdown("Priority1Dropdown", {
 	Values = {"Left", "Middle", "Right", "None"},
@@ -1951,6 +1998,7 @@ SkillTreeGroup:AddDropdown("Priority1Dropdown", {
 	Multi = false,
 	Text = "Priority 1",
 })
+SkillTreeGroup:AddLabel("First path to unlock skills in.", true)
 
 SkillTreeGroup:AddDropdown("Priority2Dropdown", {
 	Values = {"Left", "Middle", "Right", "None"},
@@ -1958,6 +2006,7 @@ SkillTreeGroup:AddDropdown("Priority2Dropdown", {
 	Multi = false,
 	Text = "Priority 2",
 })
+SkillTreeGroup:AddLabel("Second path once Priority 1 is complete.", true)
 
 SkillTreeGroup:AddDropdown("Priority3Dropdown", {
 	Values = {"Left", "Middle", "Right", "None"},
@@ -1965,15 +2014,17 @@ SkillTreeGroup:AddDropdown("Priority3Dropdown", {
 	Multi = false,
 	Text = "Priority 3",
 })
+SkillTreeGroup:AddLabel("Final path, or set to None to skip.", true)
 
 -- ==========================================
--- MISC TAB : Slot Groupbox
+-- LOBBY › SETTINGS TAB : Slot Groupbox
 -- ==========================================
 
 SlotGroup:AddToggle("AutoSelectSlot", {
 	Text = "Auto Select Slot",
 	Default = false,
 })
+SlotGroup:AddLabel("Automatically selects and loads your chosen slot.", true)
 Toggles.AutoSelectSlot:OnChanged(function()
 	getgenv().AutoSlot = Toggles.AutoSelectSlot.Value
 	if getgenv().AutoSlot and not lp:GetAttribute("Slot") then
@@ -1996,11 +2047,13 @@ SlotGroup:AddDropdown("SelectSlotDropdown", {
 	Multi = false,
 	Text = "Select Slot",
 })
+SlotGroup:AddLabel("The save slot to auto-select on join.", true)
 
 SlotGroup:AddToggle("AutoPrestigeToggle", {
 	Text = "Auto Prestige",
 	Default = false,
 })
+SlotGroup:AddLabel("Automatically Prestiges after you hit the Lvl Max.", true)
 Toggles.AutoPrestigeToggle:OnChanged(function()
 	getgenv().AutoPrestige = Toggles.AutoPrestigeToggle.Value
 	if getgenv().AutoPrestige then
@@ -2039,8 +2092,9 @@ SlotGroup:AddDropdown("SelectBoostDropdown", {
 	Values = {"Luck Boost", "EXP Boost", "Gold Boost"},
 	Default = 1,
 	Multi = false,
-	Text = "Select Boost",
+	Text = "Prestige Boost",
 })
+SlotGroup:AddLabel("The boost you want to apply when prestiging.", true)
 
 SlotGroup:AddSlider("PrestigeGoldSlider", {
 	Text = "Prestige Gold (in millions)",
@@ -2049,21 +2103,23 @@ SlotGroup:AddSlider("PrestigeGoldSlider", {
 	Max = 100,
 	Rounding = 0,
 })
+SlotGroup:AddLabel("Minimum Gold required before Auto Prestige fires.", true)
 
 -- ==========================================
--- MISC TAB : Family Roll Groupbox
+-- LOBBY › SETTINGS TAB : Family Roll Groupbox
 -- ==========================================
 
 FamilyRollGroup:AddToggle("AutoRollToggle", {
 	Text = "Auto Roll",
 	Default = false,
 })
+FamilyRollGroup:AddLabel("Rolls for families until a target or rarity is hit.", true)
 Toggles.AutoRollToggle:OnChanged(function()
 	getgenv().AutoRoll = Toggles.AutoRollToggle.Value
 	if getgenv().AutoRoll then
 		if game.PlaceId ~= 13379208636 then
 			Library:Notify({
-				Title = "TITANIC HUB",
+				Title = "Tekkit Hub",
 				Description = "You must be in the lobby to use family roll features.",
 				Time = 3
 			})
@@ -2098,13 +2154,14 @@ end)
 
 FamilyRollGroup:AddInput("SelectFamily", {
 	Default = "",
-	Text = "Select Families",
+	Text = "Target Families",
 	Placeholder = "Fritz,Yeager,etc.",
 })
+FamilyRollGroup:AddLabel("Stop rolling when one of these families is hit.", true)
 Options.SelectFamily:OnChanged(function()
 	if Options.SelectFamily.Value ~= "" then
 		Library:Notify({
-			Title = "TITANIC HUB",
+			Title = "Tekkit Hub",
 			Description = "Families selected: " .. Options.SelectFamily.Value,
 			Time = 2
 		})
@@ -2115,19 +2172,19 @@ FamilyRollGroup:AddDropdown("SelectFamilyRarity", {
 	Values = familyRaritiesOptions,
 	Default = {},
 	Multi = true,
-	Text = "Stop At",
+	Text = "Stop At Rarity",
 })
-
-FamilyRollGroup:AddLabel("Mythical families won't be rolled\nSeparate families with commas & no spaces (Fritz,Yeager)", true)
+FamilyRollGroup:AddLabel("Stops rolling when this rarity or higher is obtained. Mythicals are never rolled. Separate families with commas, no spaces.", true)
 
 -- ==========================================
--- SETTINGS TAB : Webhook & UI Groupbox
+-- IN-GAME SETTINGS TAB : Settings & Webhook Groupboxes
 -- ==========================================
 
 WebhookGroup:AddToggle("ToggleRewardWebhook", {
 	Text = "Reward Webhook",
 	Default = false,
 })
+WebhookGroup:AddLabel("Sends a Discord webhook when rewards are received.", true)
 Toggles.ToggleRewardWebhook:OnChanged(function()
 	getgenv().RewardWebhook = Toggles.ToggleRewardWebhook.Value
 end)
@@ -2136,6 +2193,7 @@ WebhookGroup:AddToggle("ToggleMythicalFamilyWebhook", {
 	Text = "Mythical Family Webhook",
 	Default = false,
 })
+WebhookGroup:AddLabel("Sends a webhook when a Mythical family is rolled.", true)
 Toggles.ToggleMythicalFamilyWebhook:OnChanged(function()
 	getgenv().MythicalFamilyWebhook = Toggles.ToggleMythicalFamilyWebhook.Value
 end)
@@ -2145,6 +2203,7 @@ WebhookGroup:AddInput("WebhookUrl", {
 	Text = "Webhook URL",
 	Placeholder = "https://discord.com/api/webhooks/...",
 })
+WebhookGroup:AddLabel("Your Discord webhook URL for notifications.", true)
 Options.WebhookUrl:OnChanged(function()
 	webhook = Options.WebhookUrl.Value
 end)
@@ -2153,11 +2212,13 @@ SettingsGroup:AddToggle("AutoHideToggle", {
 	Text = "Auto Hide GUI",
 	Default = false,
 })
+SettingsGroup:AddLabel("Hides the GUI automatically after loading.", true)
 
 SettingsGroup:AddToggle("Disable3DRendering", {
 	Text = "Disable 3D Rendering (FPS Boost)",
 	Default = false,
 })
+SettingsGroup:AddLabel("Stops 3D scene rendering for a significant FPS boost.", true)
 Toggles.Disable3DRendering:OnChanged(function()
 	RunService:Set3dRenderingEnabled(not Toggles.Disable3DRendering.Value)
 end)
@@ -2168,13 +2229,14 @@ Library.ToggleKeybind = Options.MenuKeybind
 ThemeManager:SetLibrary(Library)
 SaveManager:SetLibrary(Library)
 
-ThemeManager:SetFolder("THUB/aotr")
-SaveManager:SetFolder("THUB/aotr")
+ThemeManager:SetFolder("UsSuite/aotr")
+SaveManager:SetFolder("UsSuite/aotr")
 
-SaveManager:BuildConfigSection(Tabs.Settings)
-ThemeManager:ApplyToTab(Tabs.Settings)
+-- Use In-Game Settings tab for config & theme (replaces old Tabs.Settings)
+SaveManager:BuildConfigSection(Tabs.InGame_Settings)
+ThemeManager:ApplyToTab(Tabs.InGame_Settings)
 
-ThemeManager:ApplyTheme("Jester")
+ThemeManager:ApplyTheme("Dark")
 SaveManager:LoadAutoloadConfig()
 
 Library:OnUnload(function()
@@ -2202,8 +2264,8 @@ task.spawn(function()
 	if Toggles.AutoHideToggle.Value then
 		Library:Toggle(false)
 		Library:Notify({
-			Title = "TITANIC HUB",
-			Description = "Auto Hid GUI",
+			Title = "Tekkit Hub",
+			Description = "GUI auto-hidden. Press RightControl to show.",
 			Time = 2
 		})
 	end
