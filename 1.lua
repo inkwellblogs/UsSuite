@@ -2626,6 +2626,398 @@ game:GetService("UserInputService").InputBegan:Connect(function(inp, gp)
 	end
 end)
 
+-- ==========================================
+-- MAIN MENU › AUTOMATION TAB : Thunder Spear Quest
+-- ==========================================
+
+local QuestGroup = TabMenuAuto:AddLeftGroupbox("Thunder Spear Quest")
+
+-- Global state
+getgenv().AutoThunderQuest = false
+getgenv().ThunderQuestConfig = {
+	SlotIndex = "A",
+	TargetKills = 50,
+	DifficultyOrder = {"Aberrant", "Severe", "Hard", "Normal", "Easy"},
+}
+
+local function getQuestData()
+	local pData = GetPlayerData()
+	if not pData or not pData.Slots then return nil end
+	local slotIdx = lp:GetAttribute("Slot")
+		or Options.QuestSlotDropdown and string.sub(Options.QuestSlotDropdown.Value or "Slot A", -1)
+		or "A"
+	local slot = pData.Slots[slotIdx]
+	if not slot then return nil end
+	return slot, slotIdx, pData
+end
+
+local function getThunderSpearQuest(slot)
+	-- Quests are stored in slot.Quests — find Thunder Spear (Spears weapon quest)
+	if not slot or not slot.Quests then return nil end
+	for questId, questData in pairs(slot.Quests) do
+		local name = tostring(questData.Name or questId)
+		if string.lower(name):find("thunder") or string.lower(name):find("spear") then
+			return questId, questData
+		end
+	end
+	-- Fallback: look for weapon-type quest for Spears
+	for questId, questData in pairs(slot.Quests) do
+		if questData.Weapon == "Spears" or questData.Type == "Spears" then
+			return questId, questData
+		end
+	end
+	return nil
+end
+
+local function claimThunderQuest(questId)
+	local result = getRemote:InvokeServer("S_Quest", "Claim", questId)
+	return result
+end
+
+local function acceptThunderQuest()
+	-- Accept a new Thunder Spear quest
+	local result = getRemote:InvokeServer("S_Quest", "Accept", "Spears")
+	return result
+end
+
+local function isQuestComplete(questData)
+	if not questData then return false end
+	local progress = questData.Progress or 0
+	local goal     = questData.Goal or questData.Required or 1
+	return progress >= goal
+end
+
+-- Main quest automation loop
+local function runThunderQuestLoop()
+	UpdateStatus("Quest: Starting...")
+	
+	local LOBBY_ID  = 14916516914
+	local failCount = 0
+	local MAX_FAILS = 5
+
+	while getgenv().AutoThunderQuest do
+		task.wait(1)
+
+		-- ── Step 1: Must be in lobby ─────────────────────────────
+		if game.PlaceId ~= LOBBY_ID then
+			UpdateStatus("Quest: Waiting for lobby...")
+			task.wait(3)
+			continue
+		end
+
+		-- ── Step 2: Get slot data ────────────────────────────────
+		local slot, slotIdx, pData = getQuestData()
+		if not slot then
+			UpdateStatus("Quest: No slot data...")
+			task.wait(2)
+			continue
+		end
+
+		-- ── Step 3: Ensure Spears weapon on slot ────────────────
+		if slot.Weapon ~= "Spears" then
+			Library:Notify({
+				Title = "Thunder Spear Quest",
+				Description = "Slot " .. slotIdx .. " does not use Spears. Please switch weapon.",
+				Time = 5
+			})
+			UpdateStatus("Quest: Wrong weapon — need Spears")
+			getgenv().AutoThunderQuest = false
+			Toggles.AutoThunderQuestToggle:SetValue(false)
+			break
+		end
+
+		-- ── Step 4: Check current quest state ───────────────────
+		local questId, questData = getThunderSpearQuest(slot)
+
+		if questData and isQuestComplete(questData) then
+			-- Claim completed quest
+			UpdateStatus("Quest: Claiming reward...")
+			local claimed = claimThunderQuest(questId)
+			if claimed then
+				Library:Notify({
+					Title = "Thunder Spear Quest",
+					Description = "Quest claimed! Accepting new quest...",
+					Time = 3
+				})
+				task.wait(1)
+				-- Refresh data and accept new one
+				lastPlayerData = nil
+				slot, slotIdx, pData = getQuestData()
+				questId, questData = getThunderSpearQuest(slot)
+			end
+		end
+
+		if not questData then
+			-- Accept a new quest
+			UpdateStatus("Quest: Accepting new quest...")
+			local accepted = acceptThunderQuest()
+			if accepted then
+				Library:Notify({
+					Title = "Thunder Spear Quest",
+					Description = "New Thunder Spear quest accepted!",
+					Time = 3
+				})
+				task.wait(1)
+				lastPlayerData = nil
+			else
+				failCount = failCount + 1
+				if failCount >= MAX_FAILS then
+					Library:Notify({
+						Title = "Thunder Spear Quest",
+						Description = "Failed to accept quest " .. MAX_FAILS .. " times. Stopping.",
+						Time = 5
+					})
+					getgenv().AutoThunderQuest = false
+					Toggles.AutoThunderQuestToggle:SetValue(false)
+					break
+				end
+				task.wait(2)
+			end
+			continue
+		end
+
+		failCount = 0
+
+		local progress = questData.Progress or 0
+		local goal     = questData.Goal or questData.Required or 1
+		UpdateStatus(string.format("Quest: %d / %d kills", progress, goal))
+
+		-- ── Step 5: Start a mission to farm kills ────────────────
+		-- Leave any existing mission
+		for _, mission in next, ReplicatedStorage.Missions:GetChildren() do
+			if mission:FindFirstChild("Leader") and mission.Leader.Value == lp.Name then
+				getRemote:InvokeServer("S_Missions", "Leave")
+			end
+		end
+
+		task.wait(0.5)
+
+		-- Try difficulties from hardest to easiest
+		local created = false
+		local missionMap  = Options.QuestMapDropdown.Value  or "Trost"
+		local missionObj  = Options.QuestObjectiveDropdown and Options.QuestObjectiveDropdown.Value or "Skirmish"
+
+		for _, diff in ipairs(getgenv().ThunderQuestConfig.DifficultyOrder) do
+			if not getgenv().AutoThunderQuest then break end
+
+			getRemote:InvokeServer("S_Missions", "Create", {
+				Difficulty = diff,
+				Type       = "Missions",
+				Name       = missionMap,
+				Objective  = missionObj,
+			})
+
+			-- Wait to confirm creation
+			local start = os.clock()
+			while os.clock() - start < 2 do
+				for _, mission in next, ReplicatedStorage.Missions:GetChildren() do
+					if mission:FindFirstChild("Leader") and mission.Leader.Value == lp.Name then
+						created = true
+						break
+					end
+				end
+				if created then break end
+				task.wait(0.1)
+			end
+
+			if created then
+				Library:Notify({
+					Title = "Thunder Spear Quest",
+					Description = "Mission created: " .. missionMap .. " (" .. diff .. ")",
+					Time = 2
+				})
+				break
+			end
+		end
+
+		if not created then
+			UpdateStatus("Quest: Mission create failed, retrying...")
+			task.wait(3)
+			continue
+		end
+
+		-- Start the mission
+		task.wait(0.3)
+		getRemote:InvokeServer("S_Missions", "Start")
+		UpdateStatus("Quest: Mission started, farming kills...")
+
+		-- ── Step 6: Wait for mission to finish (poll quest progress) ──
+		local missionTimeout = 600 -- 10 min hard cap
+		local missionStart   = os.clock()
+		local lastProgress   = progress
+
+		while getgenv().AutoThunderQuest do
+			task.wait(3)
+
+			if os.clock() - missionStart > missionTimeout then
+				UpdateStatus("Quest: Mission timeout, restarting...")
+				break
+			end
+
+			-- Refresh quest progress
+			lastPlayerData = nil
+			local s2, _, _ = getQuestData()
+			if s2 then
+				local _, qd2 = getThunderSpearQuest(s2)
+				if qd2 then
+					local newProgress = qd2.Progress or 0
+					local newGoal     = qd2.Goal or qd2.Required or 1
+					UpdateStatus(string.format("Quest: %d / %d kills", newProgress, newGoal))
+
+					if newProgress > lastProgress then
+						Library:Notify({
+							Title = "Thunder Spear Quest",
+							Description = string.format("Progress: %d / %d kills", newProgress, newGoal),
+							Time = 1.5
+						})
+						lastProgress = newProgress
+					end
+
+					if isQuestComplete(qd2) then
+						UpdateStatus("Quest: Complete! Returning to lobby...")
+						task.spawn(function()
+							getRemote:InvokeServer("Functions", "Teleport", "Lobby")
+						end)
+						task.wait(2)
+						break
+					end
+				end
+			end
+
+			-- Check if we're still in a mission (left mission = go back to lobby)
+			if game.PlaceId == LOBBY_ID then
+				UpdateStatus("Quest: Back in lobby, rechecking...")
+				break
+			end
+		end
+	end
+
+	UpdateStatus("Idle")
+end
+
+-- ── UI Elements ──────────────────────────────────────────────
+
+QuestGroup:AddToggle("AutoThunderQuestToggle", {
+	Text = "Auto Thunder Spear Quest",
+	Default = false,
+})
+QuestGroup:AddLabel("Automatically farms and claims Thunder Spear quests.", true)
+Toggles.AutoThunderQuestToggle:OnChanged(function()
+	getgenv().AutoThunderQuest = Toggles.AutoThunderQuestToggle.Value
+	if getgenv().AutoThunderQuest then
+		if game.PlaceId ~= 14916516914 then
+			Library:Notify({
+				Title = "Thunder Spear Quest",
+				Description = "Must be in the Lobby to use this feature.",
+				Time = 3
+			})
+			getgenv().AutoThunderQuest = false
+			Toggles.AutoThunderQuestToggle:SetValue(false)
+			return
+		end
+		task.spawn(runThunderQuestLoop)
+	end
+end)
+
+QuestGroup:AddDropdown("QuestSlotDropdown", {
+	Values = {"Slot A", "Slot B", "Slot C"},
+	Default = 1,
+	Multi = false,
+	Text = "Quest Slot",
+})
+QuestGroup:AddLabel("The slot that has Spears equipped (must use Spears weapon).", true)
+Options.QuestSlotDropdown:OnChanged(function()
+	local s = Options.QuestSlotDropdown.Value
+	getgenv().ThunderQuestConfig.SlotIndex = string.sub(s, -1)
+end)
+
+QuestGroup:AddDropdown("QuestMapDropdown", {
+	Values = {"Shiganshina", "Trost", "Outskirts", "Giant Forest", "Utgard", "Loading Docks"},
+	Default = 2,
+	Multi = false,
+	Text = "Farm Map",
+})
+QuestGroup:AddLabel("Map to run missions on while farming quest kills.", true)
+
+QuestGroup:AddDropdown("QuestObjectiveDropdown", {
+	Values = {"Skirmish", "Protect", "Escort", "Guard", "Defend", "Stall", "Breach", "Random"},
+	Default = 1,
+	Multi = false,
+	Text = "Mission Objective",
+})
+QuestGroup:AddLabel("Objective type for the farming mission.", true)
+
+QuestGroup:AddDropdown("QuestDifficultyDropdown", {
+	Values = {"Easy", "Normal", "Hard", "Severe", "Aberrant", "Hardest"},
+	Default = 6,
+	Multi = false,
+	Text = "Max Difficulty",
+})
+QuestGroup:AddLabel("Tries highest difficulty first, steps down if unavailable.", true)
+Options.QuestDifficultyDropdown:OnChanged(function()
+	local v = Options.QuestDifficultyDropdown.Value
+	local allDiffs = {"Easy", "Normal", "Hard", "Severe", "Aberrant"}
+	-- Build descending order from selected max
+	local idx = table.find(allDiffs, v) or #allDiffs
+	local order = {}
+	for i = idx, 1, -1 do table.insert(order, allDiffs[i]) end
+	getgenv().ThunderQuestConfig.DifficultyOrder = order
+end)
+
+QuestGroup:AddButton({
+	Text = "Claim Quest Now",
+	Subtitle = "Manually claim a completed Thunder Spear quest.",
+	Func = function()
+		local slot = getQuestData()
+		if not slot then
+			Library:Notify({ Title = "Thunder Spear Quest", Description = "No slot data found.", Time = 3 })
+			return
+		end
+		local questId, questData = getThunderSpearQuest(slot)
+		if not questId then
+			Library:Notify({ Title = "Thunder Spear Quest", Description = "No Thunder Spear quest found.", Time = 3 })
+			return
+		end
+		if not isQuestComplete(questData) then
+			local p = questData.Progress or 0
+			local g = questData.Goal or questData.Required or 1
+			Library:Notify({ Title = "Thunder Spear Quest", Description = string.format("Quest not complete yet (%d/%d kills).", p, g), Time = 3 })
+			return
+		end
+		local ok = claimThunderQuest(questId)
+		Library:Notify({
+			Title = "Thunder Spear Quest",
+			Description = ok and "Quest claimed successfully!" or "Failed to claim quest.",
+			Time = 3
+		})
+	end,
+})
+
+QuestGroup:AddButton({
+	Text = "Check Quest Status",
+	Subtitle = "Shows current Thunder Spear quest progress.",
+	Func = function()
+		lastPlayerData = nil
+		local slot = getQuestData()
+		if not slot then
+			Library:Notify({ Title = "Thunder Spear Quest", Description = "No slot data.", Time = 3 })
+			return
+		end
+		local questId, questData = getThunderSpearQuest(slot)
+		if not questData then
+			Library:Notify({ Title = "Thunder Spear Quest", Description = "No active Thunder Spear quest.", Time = 3 })
+			return
+		end
+		local p = questData.Progress or 0
+		local g = questData.Goal or questData.Required or 1
+		Library:Notify({
+			Title = "Thunder Spear Quest",
+			Description = string.format("Progress: %d / %d kills\nStatus: %s", p, g, isQuestComplete(questData) and "COMPLETE — Ready to claim!" or "In Progress"),
+			Time = 5
+		})
+	end,
+})
+
 ThemeManager:SetLibrary(Library)
 SaveManager:SetLibrary(Library)
 
