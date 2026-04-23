@@ -76,11 +76,11 @@ local familyRaritiesOptions = {
 }
 
 -- Config system for persistent dropdown state
-if not isfolder("./THUH") then makefolder("./THUB") end
-if not isfolder("./THUB/aotr") then makefolder("./THUB/aotr") end
+if not isfolder("./UsSuite") then makefolder("./UsSuite") end
+if not isfolder("./UsSuite/aotr") then makefolder("./UsSuite/aotr") end
 
-local ConfigFile = "./THUB/aotr/dropdown_config.json"
-local returnCounterPath = "./THUB/aotr/return_lobby_counter.txt"
+local ConfigFile = "./UsSuite/aotr/dropdown_config.json"
+local returnCounterPath = "./UsSuite/aotr/return_lobby_counter.txt"
 local HttpService = game:GetService("HttpService")
 
 local function LoadConfig()
@@ -192,7 +192,7 @@ function AutoFarm:Start()
 		while self._running and not checkReady() do
 			if os.clock() - startTime > 10 then -- Notify every 10s if still waiting
 				Library:Notify({
-					Title = "TITANIC HUB",
+					Title = "Tekkit Hub",
 					Description = "Still waiting for mission assets to load...",
 					Time = 5
 				})
@@ -620,7 +620,7 @@ local data = {
 	Special = {}
 }
 
-local path = "./THUB/aotr/games_played.txt"
+local path = "./UsSuite/aotr/games_played.txt"
 if not isfile(path) then writefile(path, "0") end
 local gamesPlayed = tonumber(readfile(path))
 
@@ -631,7 +631,7 @@ if rewards then
 		if not rewards.Visible then return end
 
 	gamesPlayed = gamesPlayed + 1
-		writefile("./THUB/aotr/games_played.txt", tostring(gamesPlayed))
+		writefile("./UsSuite/aotr/games_played.txt", tostring(gamesPlayed))
 
 		local gamesUntilReturn = tonumber(readfile(returnCounterPath)) or 0
 		local willReturn = false
@@ -729,7 +729,7 @@ if rewards then
 			local payload = {
 					content = hasSpecial and "MYTHICAL DROP! @everyone" or nil,
 					embeds = {{
-						title = "TH Rewards",
+						title = "Us Rewards",
 						color = hasSpecial and 0xff0000 or 0x2b2d31,
 
 
@@ -772,7 +772,7 @@ if rewards then
 						},
 
 						footer = {
-							text = "TITANIC HUB • " .. DateTime.now():FormatLocalTime("LTS", "en-us")
+							text = "Us Suite • " .. DateTime.now():FormatLocalTime("LTS", "en-us")
 						},
 
 						timestamp = DateTime.now():ToIsoDate()
@@ -1056,7 +1056,7 @@ local function roll(targets, rarities)
 						}
 					},
 					footer = {
-						text = "TITANIC HUB • " .. DateTime.now():FormatLocalTime("LTS", "en-us")
+						text = "Us Suite • " .. DateTime.now():FormatLocalTime("LTS", "en-us")
 					},
 					timestamp = DateTime.now():ToIsoDate()
 				}}
@@ -1072,7 +1072,7 @@ local function roll(targets, rarities)
 
 		pcall(function()
 			Library:Notify({
-				Title = "TITANIC HUB",
+				Title = "Tekkit Hub",
 				Description = "Target family rolled: " .. familyString,
 				Time = 5,
 			})
@@ -1194,47 +1194,459 @@ postRemote.OnClientEvent:Connect(function(...)
 end)
 
 -- ==========================================
--- OBSIDIAN UI LIBRARY LOAD
+-- TEKKIT HUB CUSTOM UI LIBRARY (inline)
 -- ==========================================
 
-local repo = "https://raw.githubusercontent.com/deividcomsono/Obsidian/main/"
-local Library = loadstring(game:HttpGet(repo .. "Library.lua"))()
-local ThemeManager = loadstring(game:HttpGet(repo .. "addons/ThemeManager.lua"))()
-local SaveManager = loadstring(game:HttpGet(repo .. "addons/SaveManager.lua"))()
+local Library, ThemeManager, SaveManager = (function()
+
+local TweenService     = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local Players          = game:GetService("Players")
+local lp2              = Players.LocalPlayer
+
+local C = {
+    BG          = Color3.fromRGB(28,  28,  30),
+    SIDEBAR     = Color3.fromRGB(22,  22,  24),
+    PANEL       = Color3.fromRGB(34,  34,  36),
+    ROW         = Color3.fromRGB(40,  40,  43),
+    ROW_HOVER   = Color3.fromRGB(50,  50,  54),
+    DIVIDER     = Color3.fromRGB(55,  55,  58),
+    SECTION     = Color3.fromRGB(130, 130, 140),
+    NAV_TEXT    = Color3.fromRGB(210, 210, 215),
+    NAV_ACTIVE  = Color3.fromRGB(255, 255, 255),
+    NAV_ACTIVE_BG = Color3.fromRGB(55, 55, 60),
+    TITLE_TEXT  = Color3.fromRGB(255, 255, 255),
+    SUB_TEXT    = Color3.fromRGB(140, 140, 150),
+    ACCENT      = Color3.fromRGB(100, 210, 255),
+    TOGGLE_OFF  = Color3.fromRGB(75,  75,  80),
+    TOGGLE_ON   = Color3.fromRGB(48,  180, 120),
+    SLIDER_BG   = Color3.fromRGB(55,  55,  60),
+    SLIDER_FILL = Color3.fromRGB(100, 210, 255),
+    INPUT_BG    = Color3.fromRGB(22,  22,  24),
+    INPUT_BORDER= Color3.fromRGB(70,  70,  75),
+    BTN_BG      = Color3.fromRGB(50,  50,  55),
+    BTN_HOVER   = Color3.fromRGB(65,  65,  72),
+    BTN_TEXT    = Color3.fromRGB(220, 220, 225),
+    NOTIF_BG    = Color3.fromRGB(38,  38,  42),
+    NOTIF_BORDER= Color3.fromRGB(70,  70,  78),
+    WINDOW_TITLE= Color3.fromRGB(255, 255, 255),
+    FOOTER_TEXT = Color3.fromRGB(110, 110, 120),
+    TOPBAR      = Color3.fromRGB(22,  22,  24),
+    DROP_BG     = Color3.fromRGB(28,  28,  32),
+    DROP_ITEM   = Color3.fromRGB(40,  40,  44),
+    DROP_HOVER  = Color3.fromRGB(55,  55,  60),
+    DROP_BORDER = Color3.fromRGB(65,  65,  72),
+}
+
+local function newI(cls, props)
+    local o = Instance.new(cls)
+    for k,v in pairs(props) do o[k]=v end
+    return o
+end
+local function tw(obj, goal, t) TweenService:Create(obj, TweenInfo.new(t or 0.15, Enum.EasingStyle.Quad), goal):Play() end
+local function corner(p, r) local c=Instance.new("UICorner") c.CornerRadius=UDim.new(0,r or 6) c.Parent=p return c end
+local function stroke(p, col, th) local s=Instance.new("UIStroke") s.Color=col or C.DIVIDER s.Thickness=th or 1 s.ApplyStrokeMode=Enum.ApplyStrokeMode.Border s.Parent=p return s end
+local function pad(p,t,b,l,r) local x=Instance.new("UIPadding") x.PaddingTop=UDim.new(0,t or 0) x.PaddingBottom=UDim.new(0,b or 0) x.PaddingLeft=UDim.new(0,l or 0) x.PaddingRight=UDim.new(0,r or 0) x.Parent=p end
+local function listL(p,dir,sp) local l=Instance.new("UIListLayout") l.FillDirection=dir or Enum.FillDirection.Vertical l.SortOrder=Enum.SortOrder.LayoutOrder l.Padding=UDim.new(0,sp or 0) l.Parent=p return l end
+local function lbl(parent,text,size,color,halign,extra)
+    local o=newI("TextLabel",{Text=text,TextSize=size or 13,TextColor3=color or C.TITLE_TEXT,Font=Enum.Font.GothamSemibold,BackgroundTransparency=1,TextXAlignment=halign or Enum.TextXAlignment.Left,TextWrapped=true,Size=UDim2.new(1,0,0,(size or 13)+5),Parent=parent})
+    if extra then for k,v in pairs(extra) do o[k]=v end end
+    return o
+end
+local function makeDraggable(handle, frame)
+    local drag,inp,start,pos=false
+    handle.InputBegan:Connect(function(i) if i.UserInputType==Enum.UserInputType.MouseButton1 then drag=true start=i.Position pos=frame.Position end end)
+    handle.InputChanged:Connect(function(i) if i.UserInputType==Enum.UserInputType.MouseMovement then inp=i end end)
+    handle.InputEnded:Connect(function(i) if i.UserInputType==Enum.UserInputType.MouseButton1 then drag=false end end)
+    UserInputService.InputChanged:Connect(function(i) if i==inp and drag then local d=i.Position-start frame.Position=UDim2.new(pos.X.Scale,pos.X.Offset+d.X,pos.Y.Scale,pos.Y.Offset+d.Y) end end)
+end
+
+local Library = { Options={}, Toggles={}, Unloaded=false, _unloadCbs={}, _notifQ={}, _notifBusy=false, ToggleKeybind=nil, _mainGui=nil }
+local notifHolder
+
+local function nextNotif()
+    if #Library._notifQ==0 then Library._notifBusy=false return end
+    Library._notifBusy=true
+    local n=table.remove(Library._notifQ,1)
+    local f=newI("Frame",{Size=UDim2.new(0,280,0,0),BackgroundColor3=C.NOTIF_BG,AutomaticSize=Enum.AutomaticSize.Y,Parent=notifHolder})
+    corner(f,8) stroke(f,C.NOTIF_BORDER)
+    newI("Frame",{Size=UDim2.new(0,3,1,0),BackgroundColor3=C.ACCENT,BorderSizePixel=0,Parent=f})
+    local inner=newI("Frame",{Size=UDim2.new(1,0,0,0),BackgroundTransparency=1,AutomaticSize=Enum.AutomaticSize.Y,Parent=f})
+    pad(inner,10,10,14,12) listL(inner,Enum.FillDirection.Vertical,3)
+    lbl(inner,n.Title or "Tekkit Hub",13,C.ACCENT)
+    local d=lbl(inner,n.Description or "",12,C.SUB_TEXT) d.Font=Enum.Font.Gotham d.AutomaticSize=Enum.AutomaticSize.Y d.Size=UDim2.new(1,0,0,0)
+    task.delay(n.Time or 3,function() tw(f,{BackgroundTransparency=1},0.3) task.wait(0.35) f:Destroy() nextNotif() end)
+end
+function Library:Notify(o) table.insert(self._notifQ,o) if not self._notifBusy then nextNotif() end end
+function Library:Toggle(v) if self._mainGui then self._mainGui.Enabled=v~=nil and v or not self._mainGui.Enabled end end
+function Library:OnUnload(cb) table.insert(self._unloadCbs,cb) end
+
+function Library:CreateWindow(opts)
+    opts=opts or {}
+    local title=opts.Title or "Tekkit Hub"
+    local footer=opts.Footer or ""
+    local sg=newI("ScreenGui",{Name="TekkitHub",ResetOnSpawn=false,ZIndexBehavior=Enum.ZIndexBehavior.Sibling,IgnoreGuiInset=true,Parent=lp2:WaitForChild("PlayerGui")})
+    self._mainGui=sg
+
+    notifHolder=newI("Frame",{Size=UDim2.new(0,290,1,0),Position=UDim2.new(1,-300,0,0),BackgroundTransparency=1,Parent=sg})
+    local nl=listL(notifHolder,Enum.FillDirection.Vertical,8) nl.VerticalAlignment=Enum.VerticalAlignment.Bottom
+    pad(notifHolder,0,16,0,0)
+
+    local winW,winH=780,490
+    local mf=newI("Frame",{Size=UDim2.new(0,winW,0,winH),Position=UDim2.new(0.5,-winW/2,0.5,-winH/2),BackgroundColor3=C.BG,BorderSizePixel=0,ClipsDescendants=true,Parent=sg})
+    corner(mf,10) stroke(mf,C.DIVIDER)
+
+    -- Top bar
+    local tb=newI("Frame",{Size=UDim2.new(1,0,0,42),BackgroundColor3=C.TOPBAR,BorderSizePixel=0,Parent=mf})
+    corner(tb,10)
+    newI("Frame",{Size=UDim2.new(1,0,0,10),Position=UDim2.new(0,0,1,-10),BackgroundColor3=C.TOPBAR,BorderSizePixel=0,Parent=tb})
+    lbl(tb,title,14,C.WINDOW_TITLE,Enum.TextXAlignment.Left,{Position=UDim2.new(0,18,0,0),Size=UDim2.new(0.7,0,1,0),Font=Enum.Font.GothamBold})
+
+    local function mkBtn(xOff, txt)
+        local b=newI("TextButton",{Size=UDim2.new(0,28,0,28),Position=UDim2.new(1,xOff,0.5,-14),BackgroundColor3=Color3.fromRGB(60,60,65),Text=txt,TextColor3=Color3.fromRGB(200,200,205),TextSize=16,Font=Enum.Font.GothamBold,Parent=tb})
+        corner(b,6) return b
+    end
+    local closeB=mkBtn(-36,"×")
+    local minB=mkBtn(-72,"–")
+    closeB.MouseButton1Click:Connect(function()
+        tw(mf,{Size=UDim2.new(0,winW,0,0)},0.2) task.wait(0.22) sg:Destroy()
+        for _,cb in ipairs(Library._unloadCbs) do pcall(cb) end Library.Unloaded=true
+    end)
+    local minimised=false
+    minB.MouseButton1Click:Connect(function()
+        minimised=not minimised
+        tw(mf,{Size=UDim2.new(0,winW,0,minimised and 42 or winH)},0.2)
+    end)
+    makeDraggable(tb,mf)
+
+    -- Body
+    local body=newI("Frame",{Size=UDim2.new(1,0,1,-42),Position=UDim2.new(0,0,0,42),BackgroundTransparency=1,Parent=mf})
+    local sbW=175
+    local sb=newI("Frame",{Size=UDim2.new(0,sbW,1,0),BackgroundColor3=C.SIDEBAR,BorderSizePixel=0,Parent=body})
+    newI("Frame",{Size=UDim2.new(1,0,0,10),BackgroundColor3=C.SIDEBAR,BorderSizePixel=0,Parent=sb})
+    -- divider line
+    newI("Frame",{Size=UDim2.new(0,1,1,0),Position=UDim2.new(1,-1,0,0),BackgroundColor3=C.DIVIDER,BorderSizePixel=0,Parent=sb})
+
+    local sbScroll=newI("ScrollingFrame",{Size=UDim2.new(1,0,1,-30),Position=UDim2.new(0,0,0,8),BackgroundTransparency=1,ScrollBarThickness=0,BorderSizePixel=0,CanvasSize=UDim2.new(0,0,0,0),AutomaticCanvasSize=Enum.AutomaticSize.Y,Parent=sb})
+    listL(sbScroll,Enum.FillDirection.Vertical,1) pad(sbScroll,4,4,8,8)
+    newI("TextLabel",{Size=UDim2.new(1,0,0,22),Position=UDim2.new(0,0,1,-26),BackgroundTransparency=1,Text=footer,TextSize=10,TextColor3=C.FOOTER_TEXT,Font=Enum.Font.Gotham,TextXAlignment=Enum.TextXAlignment.Center,Parent=sb})
+
+    local cp=newI("Frame",{Size=UDim2.new(1,-sbW,1,0),Position=UDim2.new(0,sbW,0,0),BackgroundColor3=C.PANEL,BorderSizePixel=0,Parent=body})
+
+    local Win={_sb=sbScroll,_cp=cp,_navBtns={},_activePage=nil,_secOrder=0}
+
+    -- AddSection: creates a sidebar category header + returns section with AddTab
+    function Win:AddSection(name)
+        local secLbl=newI("TextLabel",{
+            Size=UDim2.new(1,0,0,20),
+            BackgroundTransparency=1,
+            Text=string.upper(name),
+            TextSize=10,
+            TextColor3=C.SECTION,
+            Font=Enum.Font.GothamBold,
+            TextXAlignment=Enum.TextXAlignment.Left,
+            LayoutOrder=self._secOrder,
+            Parent=self._sb,
+        })
+        pad(secLbl,6,0,6,0)
+        self._secOrder=self._secOrder+1
+
+        local section={_win=self}
+        function section:AddTab(tabName)
+            return Win:_makeTab(tabName)
+        end
+        return section
+    end
+
+    -- _makeTab: internal tab builder
+    function Win:_makeTab(tabName)
+        local order = self._secOrder
+        self._secOrder = self._secOrder + 1
+
+        -- Content scroll page
+        local page=newI("ScrollingFrame",{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,ScrollBarThickness=3,ScrollBarImageColor3=C.DIVIDER,BorderSizePixel=0,CanvasSize=UDim2.new(0,0,0,0),AutomaticCanvasSize=Enum.AutomaticSize.Y,Visible=false,Parent=self._cp})
+        listL(page,Enum.FillDirection.Vertical,0) pad(page,12,12,16,16)
+
+        -- Nav button
+        local nb=newI("TextButton",{Size=UDim2.new(1,0,0,36),BackgroundColor3=Color3.fromRGB(0,0,0),BackgroundTransparency=1,Text="",LayoutOrder=order,Parent=self._sb})
+        corner(nb,7)
+        local nl2=lbl(nb,tabName,13,C.NAV_TEXT,Enum.TextXAlignment.Left,{Position=UDim2.new(0,12,0,0),Size=UDim2.new(1,-12,1,0)})
+        local abar=newI("Frame",{Size=UDim2.new(0,3,0.55,0),Position=UDim2.new(0,0,0.225,0),BackgroundColor3=C.ACCENT,BackgroundTransparency=1,BorderSizePixel=0,Parent=nb})
+        corner(abar,2)
+
+        local entry={btn=nb,lbl=nl2,bar=abar,page=page}
+        table.insert(self._navBtns,entry)
+
+        local winRef = self
+        local function activate()
+            for _,e in ipairs(winRef._navBtns) do
+                e.page.Visible=false
+                tw(e.btn,{BackgroundTransparency=1},0.1)
+                tw(e.lbl,{TextColor3=C.NAV_TEXT},0.1)
+                tw(e.bar,{BackgroundTransparency=1},0.1)
+            end
+            page.Visible=true
+            tw(nb,{BackgroundColor3=C.NAV_ACTIVE_BG,BackgroundTransparency=0},0.1)
+            tw(nl2,{TextColor3=C.NAV_ACTIVE},0.1)
+            tw(abar,{BackgroundTransparency=0},0.1)
+            winRef._activePage=page
+        end
+        nb.MouseButton1Click:Connect(activate)
+        nb.MouseEnter:Connect(function() if winRef._activePage~=page then tw(nb,{BackgroundColor3=Color3.fromRGB(38,38,42),BackgroundTransparency=0},0.08) end end)
+        nb.MouseLeave:Connect(function() if winRef._activePage~=page then tw(nb,{BackgroundTransparency=1},0.08) end end)
+        if #self._navBtns==1 then activate() end
+
+        -- ── Tab object ──────────────────────────────────
+        local Tab={}
+
+        local function makeRow(titleTxt, subtitleTxt)
+            local row=newI("Frame",{Size=UDim2.new(1,0,0,0),BackgroundColor3=C.ROW,BorderSizePixel=0,AutomaticSize=Enum.AutomaticSize.Y,Parent=page})
+            corner(row,6)
+            newI("Frame",{Size=UDim2.new(1,-32,0,1),Position=UDim2.new(0,16,1,-1),BackgroundColor3=C.DIVIDER,BackgroundTransparency=0.65,BorderSizePixel=0,Parent=row})
+            local inner=newI("Frame",{Size=UDim2.new(1,0,0,0),BackgroundTransparency=1,AutomaticSize=Enum.AutomaticSize.Y,Parent=row})
+            pad(inner,10,10,14,14)
+            local tb2=newI("Frame",{Size=UDim2.new(0.55,0,0,0),BackgroundTransparency=1,AutomaticSize=Enum.AutomaticSize.Y,Parent=inner})
+            listL(tb2,Enum.FillDirection.Vertical,2)
+            if titleTxt then lbl(tb2,titleTxt,13,C.TITLE_TEXT) end
+            if subtitleTxt then local s=lbl(tb2,subtitleTxt,11,C.SUB_TEXT) s.Font=Enum.Font.Gotham s.AutomaticSize=Enum.AutomaticSize.Y s.Size=UDim2.new(1,0,0,0) end
+            local cf=newI("Frame",{Size=UDim2.new(0.45,-14,1,0),Position=UDim2.new(0.55,0,0,0),BackgroundTransparency=1,Parent=inner})
+            row.MouseEnter:Connect(function() tw(row,{BackgroundColor3=C.ROW_HOVER},0.08) end)
+            row.MouseLeave:Connect(function() tw(row,{BackgroundColor3=C.ROW},0.08) end)
+            newI("Frame",{Size=UDim2.new(1,0,0,4),BackgroundTransparency=1,Parent=page})
+            return row,cf
+        end
+
+        function Tab:AddToggle(id,opts)
+            opts=opts or {}
+            local val=opts.Default or false
+            local cbs={}
+            local obj={Value=val,_cbs=cbs}
+            local row,cf=makeRow(opts.Text,opts.Subtitle)
+            local sw,sh=44,24
+            local sbg=newI("Frame",{Size=UDim2.new(0,sw,0,sh),Position=UDim2.new(1,-sw,0.5,-sh/2),BackgroundColor3=val and C.TOGGLE_ON or C.TOGGLE_OFF,Parent=cf})
+            corner(sbg,sh/2)
+            local th2=newI("Frame",{Size=UDim2.new(0,sh-6,0,sh-6),Position=UDim2.new(0,val and sw-sh+3 or 3,0,3),BackgroundColor3=Color3.new(1,1,1),Parent=sbg})
+            corner(th2,(sh-6)/2)
+            local btn2=newI("TextButton",{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,Text="",Parent=sbg})
+            local function setV(v,fire)
+                val=v obj.Value=v
+                tw(sbg,{BackgroundColor3=v and C.TOGGLE_ON or C.TOGGLE_OFF},0.15)
+                tw(th2,{Position=UDim2.new(0,v and sw-sh+3 or 3,0,3)},0.15)
+                if fire~=false then for _,cb in ipairs(cbs) do pcall(cb,v) end end
+            end
+            btn2.MouseButton1Click:Connect(function() setV(not val) end)
+            row.InputBegan:Connect(function(i) if i.UserInputType==Enum.UserInputType.MouseButton1 then setV(not val) end end)
+            function obj:SetValue(v) setV(v,true) end
+            function obj:OnChanged(cb) table.insert(cbs,cb) return obj end
+            Library.Toggles[id]=obj return obj
+        end
+
+        function Tab:AddDropdown(id,opts)
+            opts=opts or {}
+            local vals=opts.Values or {}
+            local multi=opts.Multi or false
+            local defIdx=opts.Default or 1
+            local cbs={}
+            local cur=multi and (type(defIdx)=="table" and defIdx or {}) or (vals[defIdx] or vals[1])
+            local obj={Value=cur,_cbs=cbs,_vals=vals,_visible=true}
+            local row,cf=makeRow(opts.Text,opts.Subtitle)
+            local bh=28
+            local db=newI("TextButton",{Size=UDim2.new(1,0,0,bh),Position=UDim2.new(0,0,0.5,-bh/2),BackgroundColor3=C.INPUT_BG,Text="",Parent=cf})
+            corner(db,5) stroke(db,C.INPUT_BORDER)
+            local function dispTxt() if multi then local t={} for k,v in pairs(cur) do if v then table.insert(t,k) end end return #t==0 and "None" or table.concat(t,", ") else return tostring(cur or "Select...") end end
+            local dlbl=lbl(db,dispTxt(),12,C.NAV_TEXT,Enum.TextXAlignment.Left,{Position=UDim2.new(0,8,0,0),Size=UDim2.new(1,-24,1,0)})
+            lbl(db,"▾",12,C.SUB_TEXT,Enum.TextXAlignment.Right,{Position=UDim2.new(0,0,0,0),Size=UDim2.new(1,-6,1,0)})
+
+            local lf=newI("Frame",{BackgroundColor3=C.DROP_BG,BorderSizePixel=0,Visible=false,ZIndex=100,Parent=Library._mainGui})
+            corner(lf,6) stroke(lf,C.DROP_BORDER)
+            local ls=newI("ScrollingFrame",{Size=UDim2.new(1,-2,1,-2),Position=UDim2.new(0,1,0,1),BackgroundTransparency=1,ScrollBarThickness=3,ScrollBarImageColor3=C.ACCENT,BorderSizePixel=0,CanvasSize=UDim2.new(0,0,0,0),AutomaticCanvasSize=Enum.AutomaticSize.Y,ZIndex=101,Parent=lf})
+            listL(ls,Enum.FillDirection.Vertical,1) pad(ls,4,4,4,4)
+
+            local function rebuild()
+                for _,c3 in ipairs(ls:GetChildren()) do if c3:IsA("TextButton") then c3:Destroy() end end
+                for _,v in ipairs(vals) do
+                    local sel=multi and (cur[v]==true) or (cur==v)
+                    local it=newI("TextButton",{Size=UDim2.new(1,0,0,30),BackgroundColor3=sel and C.DROP_HOVER or C.DROP_ITEM,Text="",ZIndex=102,Parent=ls})
+                    corner(it,4)
+                    lbl(it,v,12,sel and C.ACCENT or C.NAV_TEXT,Enum.TextXAlignment.Left,{Position=UDim2.new(0,8,0,0),Size=UDim2.new(1,-8,1,0),ZIndex=103})
+                    it.MouseEnter:Connect(function() if not sel then tw(it,{BackgroundColor3=C.DROP_HOVER},0.07) end end)
+                    it.MouseLeave:Connect(function() if not sel then tw(it,{BackgroundColor3=C.DROP_ITEM},0.07) end end)
+                    it.MouseButton1Click:Connect(function()
+                if multi then cur[v]=not cur[v] else cur=v end
+                obj.Value=cur dlbl.Text=dispTxt()
+                for _,cb in ipairs(cbs) do pcall(cb,cur) end
+                rebuild() if not multi then lf.Visible=false open2=false end
+                    end)
+                end
+            end
+            rebuild()
+            local open2=false
+            db.MouseButton1Click:Connect(function()
+                open2=not open2
+                if open2 then rebuild() local ap=db.AbsolutePosition local as2=db.AbsoluteSize local ic=math.min(#vals,6) lf.Position=UDim2.new(0,ap.X,0,ap.Y+as2.Y+4) lf.Size=UDim2.new(0,as2.X,0,ic*31+8) end
+                lf.Visible=open2
+            end)
+            UserInputService.InputBegan:Connect(function(i)
+                if i.UserInputType==Enum.UserInputType.MouseButton1 and open2 then
+                    local mp=UserInputService:GetMouseLocation() local ap=lf.AbsolutePosition local as2=lf.AbsoluteSize
+                    if mp.X<ap.X or mp.X>ap.X+as2.X or mp.Y<ap.Y or mp.Y>ap.Y+as2.Y then open2=false lf.Visible=false end
+                end
+            end)
+            function obj:SetValue(v) cur=v self.Value=v dlbl.Text=dispTxt() end
+            function obj:SetValues(nv) vals=nv self._vals=nv cur=nv[1] or "" self.Value=cur dlbl.Text=dispTxt() rebuild() end
+            function obj:SetVisible(vis) row.Visible=vis self._visible=vis end
+            function obj:OnChanged(cb) table.insert(cbs,cb) return obj end
+            Library.Options[id]=obj return obj
+        end
+
+        function Tab:AddSlider(id,opts)
+            opts=opts or {}
+            local mn=opts.Min or 0 local mx=opts.Max or 100 local dv=opts.Default or mn local rd=opts.Rounding or 0
+            local cbs={} local val=dv
+            local obj={Value=val,_cbs=cbs}
+            local row,cf=makeRow(opts.Text,opts.Subtitle)
+            local sh2=8
+            local trk=newI("Frame",{Size=UDim2.new(1,0,0,sh2),Position=UDim2.new(0,0,0.5,-sh2/2),BackgroundColor3=C.SLIDER_BG,Parent=cf})
+            corner(trk,sh2/2)
+            local fil=newI("Frame",{Size=UDim2.new((val-mn)/(mx-mn),0,1,0),BackgroundColor3=C.SLIDER_FILL,BorderSizePixel=0,Parent=trk})
+            corner(fil,sh2/2)
+            local vl=lbl(cf,tostring(val),11,C.ACCENT,Enum.TextXAlignment.Right,{Position=UDim2.new(0,0,0,-17),Size=UDim2.new(1,0,0,13)})
+            local ts=14
+            local th3=newI("Frame",{Size=UDim2.new(0,ts,0,ts),BackgroundColor3=Color3.new(1,1,1),ZIndex=2,Parent=trk})
+            corner(th3,ts/2)
+            local function upd(v)
+                v=math.clamp(v,mn,mx) if rd==0 then v=math.floor(v+0.5) else v=math.floor(v*(10^rd)+0.5)/(10^rd) end
+                val=v obj.Value=v local p=(v-mn)/(mx-mn)
+                tw(fil,{Size=UDim2.new(p,0,1,0)},0.05) th3.Position=UDim2.new(p,-ts/2,0.5,-ts/2) vl.Text=tostring(v)
+                for _,cb in ipairs(cbs) do pcall(cb,v) end
+            end
+            upd(dv)
+            local sliding=false
+            trk.InputBegan:Connect(function(i) if i.UserInputType==Enum.UserInputType.MouseButton1 then sliding=true local r=i.Position.X-trk.AbsolutePosition.X upd(mn+(r/trk.AbsoluteSize.X)*(mx-mn)) end end)
+            trk.InputEnded:Connect(function(i) if i.UserInputType==Enum.UserInputType.MouseButton1 then sliding=false end end)
+            UserInputService.InputChanged:Connect(function(i) if sliding and i.UserInputType==Enum.UserInputType.MouseMovement then local r=i.Position.X-trk.AbsolutePosition.X upd(mn+(r/trk.AbsoluteSize.X)*(mx-mn)) end end)
+            function obj:OnChanged(cb) table.insert(cbs,cb) return obj end
+            Library.Options[id]=obj return obj
+        end
+
+        function Tab:AddInput(id,opts)
+            opts=opts or {}
+            local cbs={} local obj={Value=opts.Default or "",_cbs=cbs}
+            local row,cf=makeRow(opts.Text,opts.Subtitle)
+            local ih=28
+            local ib=newI("TextBox",{Size=UDim2.new(1,0,0,ih),Position=UDim2.new(0,0,0.5,-ih/2),BackgroundColor3=C.INPUT_BG,TextColor3=C.NAV_TEXT,PlaceholderColor3=C.SUB_TEXT,PlaceholderText=opts.Placeholder or "",Text=opts.Default or "",TextSize=12,Font=Enum.Font.Gotham,ClearTextOnFocus=false,TextXAlignment=Enum.TextXAlignment.Left,Parent=cf})
+            corner(ib,5) stroke(ib,C.INPUT_BORDER) pad(ib,0,0,8,0)
+            ib.FocusLost:Connect(function() obj.Value=ib.Text for _,cb in ipairs(cbs) do pcall(cb,ib.Text) end end)
+            function obj:OnChanged(cb) table.insert(cbs,cb) return obj end
+            Library.Options[id]=obj return obj
+        end
+
+        function Tab:AddButton(opts)
+            opts=opts or {}
+            local row,cf=makeRow(opts.Text,opts.Subtitle)
+            local bh2=30
+            local b=newI("TextButton",{Size=UDim2.new(0,110,0,bh2),Position=UDim2.new(1,-110,0.5,-bh2/2),BackgroundColor3=C.BTN_BG,Text=opts.Text or "Click",TextColor3=C.BTN_TEXT,TextSize=12,Font=Enum.Font.GothamSemibold,Parent=cf})
+            corner(b,6)
+            b.MouseEnter:Connect(function() tw(b,{BackgroundColor3=C.BTN_HOVER},0.08) end)
+            b.MouseLeave:Connect(function() tw(b,{BackgroundColor3=C.BTN_BG},0.08) end)
+            b.MouseButton1Click:Connect(function() tw(b,{BackgroundColor3=C.ACCENT},0.05) task.delay(0.12,function() tw(b,{BackgroundColor3=C.BTN_BG},0.1) end) if opts.Func then pcall(opts.Func) end end)
+            return b
+        end
+
+        function Tab:AddLabel(text, isSub)
+            if isSub then return end
+            local lr=newI("Frame",{Size=UDim2.new(1,0,0,34),BackgroundColor3=Color3.fromRGB(30,30,33),BorderSizePixel=0,Parent=page})
+            corner(lr,6) pad(lr,0,0,14,14)
+            local l2=lbl(lr,text,12,C.ACCENT) l2.Size=UDim2.new(1,0,1,0)
+            newI("Frame",{Size=UDim2.new(1,0,0,4),BackgroundTransparency=1,Parent=page})
+            local lo={} function lo:SetText(t) l2.Text=t end return lo
+        end
+
+        function Tab:AddDivider()
+            newI("Frame",{Size=UDim2.new(1,-32,0,1),BackgroundColor3=C.DIVIDER,BorderSizePixel=0,Parent=page})
+            newI("Frame",{Size=UDim2.new(1,0,0,6),BackgroundTransparency=1,Parent=page})
+        end
+
+        function Tab:AddKeyPicker(id,opts)
+            opts=opts or {}
+            local ko={Value=opts.Default or "RightControl",_cbs={}}
+            Library.Options[id]=ko
+            local row,cf=makeRow("Menu Keybind","Press to open / close the GUI.")
+            local bh3=28
+            local kb=newI("TextButton",{Size=UDim2.new(0,130,0,bh3),Position=UDim2.new(1,-130,0.5,-bh3/2),BackgroundColor3=C.BTN_BG,Text=ko.Value,TextColor3=C.ACCENT,TextSize=12,Font=Enum.Font.GothamBold,Parent=cf})
+            corner(kb,5) stroke(kb,C.INPUT_BORDER)
+            local listening=false
+            kb.MouseButton1Click:Connect(function() listening=true kb.Text="..." kb.TextColor3=C.SUB_TEXT end)
+            UserInputService.InputBegan:Connect(function(i)
+                if listening and i.UserInputType==Enum.UserInputType.Keyboard then
+                    listening=false ko.Value=i.KeyCode.Name kb.Text=i.KeyCode.Name kb.TextColor3=C.ACCENT
+                end
+            end)
+            function ko:OnChanged(cb) table.insert(self._cbs,cb) end
+            return ko
+        end
+
+        -- Groupbox stubs (flat layout — all elements go into tab directly)
+        function Tab:AddLeftGroupbox(_) return self end
+        function Tab:AddRightGroupbox(_) return self end
+
+        return Tab
+    end -- end _makeTab
+
+    function Win:AddTab(name,_) return self:_makeTab(name) end
+    return Win
+end
+
+-- ThemeManager & SaveManager stubs
+local TM={} function TM:SetLibrary(_) end function TM:SetFolder(_) end function TM:ApplyTheme(_) end function TM:ApplyToTab(_) end
+local SM={} function SM:SetLibrary(_) end function SM:SetFolder(_) end function SM:BuildConfigSection(_) end function SM:LoadAutoloadConfig() end
+
+return Library, TM, SM
+end)()
 
 local Options = Library.Options
 local Toggles = Library.Toggles
 
+-- ==========================================
+-- TEKKIT HUB WINDOW + SIDEBAR SECTIONS
+-- ==========================================
+
 local Window = Library:CreateWindow({
-	Title = "TITANIC HUB",
-	Footer = "AOT:R | Free",
-	Center = true,
-	AutoShow = true,
-	Resizable = true,
-	ShowCustomCursor = true,
+	Title = "Tekkit Hub",
+	Footer = "AOT:R  •  v2.0",
 })
 
-local Tabs = {
-	Main = Window:AddTab("Main", "house"),
-	Upgrades = Window:AddTab("Upgrades", "trending-up"),
-	Misc = Window:AddTab("Misc", "boxes"),
-	Settings = Window:AddTab("Settings", "settings"),
-}
+-- In-Game section
+local SecInGame  = Window:AddSection("In-Game")
+local TabFarming = SecInGame:AddTab("Farming")
+local TabIGSet   = SecInGame:AddTab("Settings")
 
-local MainGroup = Tabs.Main:AddLeftGroupbox("Farm")
-local AutoStartGroup = Tabs.Main:AddRightGroupbox("Auto Start")
+-- Lobby section
+local SecLobby   = Window:AddSection("Lobby")
+local TabLobAuto = SecLobby:AddTab("Automation")
+local TabLobSet  = SecLobby:AddTab("Settings")
 
-local UpgradesGroup = Tabs.Upgrades:AddLeftGroupbox("Upgrades")
-local SkillTreeGroup = Tabs.Upgrades:AddRightGroupbox("Skill Tree")
+-- Main Menu section
+local SecMenu    = Window:AddSection("Main Menu")
+local TabMenuAuto = SecMenu:AddTab("Automation")
+local TabMenuSet  = SecMenu:AddTab("Settings")
 
-local SlotGroup = Tabs.Misc:AddLeftGroupbox("Slot")
-local FamilyRollGroup = Tabs.Misc:AddRightGroupbox("Family Roll")
+-- Group aliases (AddLeftGroupbox/AddRightGroupbox both return same Tab)
+local MainGroup      = TabFarming:AddLeftGroupbox("Farm")
+local AutoStartGroup = TabFarming:AddRightGroupbox("Auto Start")
 
-local SettingsGroup = Tabs.Misc:AddLeftGroupbox("Settings")
-local WebhookGroup = Tabs.Misc:AddRightGroupbox("Webhook")
+local SettingsGroup  = TabIGSet:AddLeftGroupbox("Settings")
+local WebhookGroup   = TabIGSet:AddRightGroupbox("Webhook")
+
+local UpgradesGroup  = TabLobAuto:AddLeftGroupbox("Upgrades")
+local SkillTreeGroup = TabLobAuto:AddRightGroupbox("Skill Tree")
+
+local SlotGroup       = TabLobSet:AddLeftGroupbox("Slot")
+local FamilyRollGroup = TabLobSet:AddRightGroupbox("Family Roll")
 
 -- ==========================================
--- MAIN TAB : Farm Groupbox
+-- IN-GAME › FARMING TAB : Farm Groupbox
+-- (Tekkit Hub style — subtitle labels under each item)
 -- ==========================================
 getgenv().CurrentStatusLabel = MainGroup:AddLabel("Status: Idle")
 
@@ -1242,6 +1654,7 @@ MainGroup:AddToggle("AutoKillToggle", {
 	Text = "Auto Farm",
 	Default = false,
 })
+MainGroup:AddLabel("Automatically kills titans and collects rewards.", true)
 Toggles.AutoKillToggle:OnChanged(function()
 	if Toggles.AutoKillToggle.Value then AutoFarm:Start() else AutoFarm:Stop() end
 end)
@@ -1250,6 +1663,7 @@ MainGroup:AddToggle("MasteryFarmToggle", {
 	Text = "Titan Mastery Farm",
 	Default = false,
 })
+MainGroup:AddLabel("Farms titan mastery XP via punching or skills.", true)
 Toggles.MasteryFarmToggle:OnChanged(function()
 	getgenv().MasteryFarmConfig.Enabled = Toggles.MasteryFarmToggle.Value
 	if Toggles.MasteryFarmToggle.Value then
@@ -1267,6 +1681,7 @@ MainGroup:AddDropdown("MasteryModeDropdown", {
 	Multi = false,
 	Text = "Mastery Mode",
 })
+MainGroup:AddLabel("Choose how mastery XP is farmed.", true)
 Options.MasteryModeDropdown:OnChanged(function()
 	getgenv().MasteryFarmConfig.Mode = Options.MasteryModeDropdown.Value
 end)
@@ -1277,6 +1692,7 @@ MainGroup:AddDropdown("MovementModeDropdown", {
 	Multi = false,
 	Text = "Movement Mode",
 })
+MainGroup:AddLabel("How the bot moves toward titans.", true)
 Options.MovementModeDropdown:OnChanged(function()
 	getgenv().AutoFarmConfig.MovementMode = Options.MovementModeDropdown.Value
 end)
@@ -1287,6 +1703,7 @@ MainGroup:AddDropdown("FarmOptionsDropdown", {
 	Multi = true,
 	Text = "Farm Options",
 })
+MainGroup:AddLabel("Extra options applied during farming.", true)
 Options.FarmOptionsDropdown:OnChanged(function()
 	local vals = Options.FarmOptionsDropdown.Value
 	getgenv().AutoFailsafe = vals["Failsafe"] or false
@@ -1302,28 +1719,28 @@ MainGroup:AddSlider("HoverSpeedSlider", {
 	Max = 500,
 	Rounding = 0,
 })
+MainGroup:AddLabel("Speed at which the bot hovers to titans.", true)
 Options.HoverSpeedSlider:OnChanged(function()
 	getgenv().AutoFarmConfig.MoveSpeed = Options.HoverSpeedSlider.Value
 end)
 
-
 MainGroup:AddSlider("FloatHeightSlider", {
-
 	Text = "Float Height",
 	Default = 250,
 	Min = 100,
 	Max = 300,
 	Rounding = 0,
 })
+MainGroup:AddLabel("Height above ground while hovering.", true)
 Options.FloatHeightSlider:OnChanged(function()
 	getgenv().AutoFarmConfig.HeightOffset = Options.FloatHeightSlider.Value
 end)
 
-
 MainGroup:AddToggle("AutoReloadToggle", {
-	Text = "Auto Reload/Refill",
+	Text = "Auto Reload / Refill",
 	Default = false,
 })
+MainGroup:AddLabel("Automatically reloads blades and refills gas.", true)
 Toggles.AutoReloadToggle:OnChanged(function()
 	autoReloadEnabled = Toggles.AutoReloadToggle.Value
 	autoRefillEnabled = Toggles.AutoReloadToggle.Value
@@ -1333,6 +1750,7 @@ MainGroup:AddToggle("AutoEscapeToggle", {
 	Text = "Auto Escape",
 	Default = false,
 })
+MainGroup:AddLabel("Escapes titan grabs automatically.", true)
 Toggles.AutoEscapeToggle:OnChanged(function()
 	getgenv().AutoEscape = Toggles.AutoEscapeToggle.Value
 end)
@@ -1341,6 +1759,7 @@ MainGroup:AddToggle("AutoSkipToggle", {
 	Text = "Auto Skip Cutscenes",
 	Default = false,
 })
+MainGroup:AddLabel("Skips mission cutscenes to save time.", true)
 Toggles.AutoSkipToggle:OnChanged(function()
 	getgenv().AutoSkip = Toggles.AutoSkipToggle.Value
 	if getgenv().AutoSkip then ExecuteImmediateAutomation() end
@@ -1350,6 +1769,7 @@ MainGroup:AddToggle("AutoRetryToggle", {
 	Text = "Auto Retry",
 	Default = false,
 })
+MainGroup:AddLabel("Retries the mission after completion or failure.", true)
 Toggles.AutoRetryToggle:OnChanged(function()
 	getgenv().AutoRetry = Toggles.AutoRetryToggle.Value
 	if getgenv().AutoRetry then ExecuteImmediateAutomation() end
@@ -1359,6 +1779,7 @@ MainGroup:AddToggle("AutoChestToggle", {
 	Text = "Auto Open Chests",
 	Default = false,
 })
+MainGroup:AddLabel("Automatically opens chests at end of mission.", true)
 Toggles.AutoChestToggle:OnChanged(function()
 	getgenv().AutoChest = Toggles.AutoChestToggle.Value
 	if getgenv().AutoChest then ExecuteImmediateAutomation() end
@@ -1368,12 +1789,14 @@ MainGroup:AddToggle("DeleteMapToggle", {
 	Text = "Delete Map (FPS Boost)",
 	Default = DropdownConfig.DeleteMap or false,
 })
+MainGroup:AddLabel("Removes map geometry for better performance.", true)
 Toggles.DeleteMapToggle:OnChanged(function()
 	getgenv().DeleteMap = Toggles.DeleteMapToggle.Value
 	DropdownConfig.DeleteMap = getgenv().DeleteMap
 	SaveConfig(DropdownConfig)
 	if getgenv().DeleteMap then DeleteMap() end
 end)
+
 MainGroup:AddToggle("SoloOnlyToggle", {
 	Text = "Solo Only",
 	Default = false,
@@ -1381,11 +1804,13 @@ MainGroup:AddToggle("SoloOnlyToggle", {
 Toggles.SoloOnlyToggle:OnChanged(function()
 	getgenv().SoloOnly = Toggles.SoloOnlyToggle.Value
 end)
+MainGroup:AddLabel("Only farms when no other players are present.", true)
 
 MainGroup:AddToggle("AutoReturnLobbyToggle", {
 	Text = "Auto Return to Lobby",
 	Default = false,
 })
+MainGroup:AddLabel("Returns to lobby after timeout or mission end.", true)
 Toggles.AutoReturnLobbyToggle:OnChanged(function()
 	getgenv().AutoReturnLobby = Toggles.AutoReturnLobbyToggle.Value
 	if not getgenv().AutoReturnLobby then
@@ -1393,10 +1818,8 @@ Toggles.AutoReturnLobbyToggle:OnChanged(function()
 	end
 end)
 
-MainGroup:AddLabel("Failsafe tps you back to lobby\nafter a timeout.")
-
 -- ==========================================
--- MAIN TAB : Auto Start Groupbox
+-- IN-GAME › FARMING TAB : Auto Start Groupbox
 -- ==========================================
 
 AutoStartGroup:AddButton({
@@ -1406,6 +1829,7 @@ AutoStartGroup:AddButton({
 		TeleportService:Teleport(14916516914, lp)
 	end,
 })
+AutoStartGroup:AddLabel("Teleports you back to the main lobby.", true)
 
 AutoStartGroup:AddButton({
 	Text = "Join Discord",
@@ -1418,11 +1842,13 @@ AutoStartGroup:AddButton({
 		})
 	end,
 })
+AutoStartGroup:AddLabel("Copies the community Discord invite link.", true)
 
 AutoStartGroup:AddToggle("AutoStartToggle", {
 	Text = "Auto Start",
 	Default = false,
 })
+AutoStartGroup:AddLabel("Automatically creates and starts missions.", true)
 Toggles.AutoStartToggle:OnChanged(function()
 	getgenv().AutoStart = Toggles.AutoStartToggle.Value
 
@@ -1560,6 +1986,7 @@ AutoStartGroup:AddDropdown("StartTypeDropdown", {
 	Multi = false,
 	Text = "Type",
 })
+AutoStartGroup:AddLabel("Choose between Missions or Raids.", true)
 Options.StartTypeDropdown:OnChanged(function()
 	local Value = Options.StartTypeDropdown.Value
 	if not Value then return end
@@ -1583,6 +2010,7 @@ AutoStartGroup:AddDropdown("MissionMapDropdown", {
 	Multi = false,
 	Text = "Mission Map",
 })
+AutoStartGroup:AddLabel("The map your mission will take place on.", true)
 Options.MissionMapDropdown:OnChanged(function()
 	local Value = Options.MissionMapDropdown.Value
 	if not Value then return end
@@ -1605,6 +2033,7 @@ AutoStartGroup:AddDropdown("MissionObjectiveDropdown", {
 	Multi = false,
 	Text = "Mission Objective",
 })
+AutoStartGroup:AddLabel("The objective type for your mission.", true)
 Options.MissionObjectiveDropdown:OnChanged(function()
 	local Value = Options.MissionObjectiveDropdown.Value
 	DropdownConfig.Missions = DropdownConfig.Missions or {}
@@ -1618,6 +2047,7 @@ AutoStartGroup:AddDropdown("MissionDifficultyDropdown", {
 	Multi = false,
 	Text = "Mission Difficulty",
 })
+AutoStartGroup:AddLabel("Hardest tries all difficulties until one works.", true)
 Options.MissionDifficultyDropdown:OnChanged(function()
 	local Value = Options.MissionDifficultyDropdown.Value
 	DropdownConfig.Missions = DropdownConfig.Missions or {}
@@ -1633,6 +2063,7 @@ AutoStartGroup:AddDropdown("RaidMapDropdown", {
 	Multi = false,
 	Text = "Raid Map",
 })
+AutoStartGroup:AddLabel("Trost: Attack  •  Shiganshina: Armored  •  Stohess: Female", true)
 Options.RaidMapDropdown:OnChanged(function()
 	local Value = Options.RaidMapDropdown.Value
 	if not Value then return end
@@ -1655,6 +2086,7 @@ AutoStartGroup:AddDropdown("RaidObjectiveDropdown", {
 	Multi = false,
 	Text = "Raid Objective",
 })
+AutoStartGroup:AddLabel("The objective for the selected raid map.", true)
 Options.RaidObjectiveDropdown:OnChanged(function()
 	local Value = Options.RaidObjectiveDropdown.Value
 	DropdownConfig.Raids = DropdownConfig.Raids or {}
@@ -1668,14 +2100,13 @@ AutoStartGroup:AddDropdown("RaidDifficultyDropdown", {
 	Multi = false,
 	Text = "Raid Difficulty",
 })
+AutoStartGroup:AddLabel("Hardest tries all raid difficulties descending.", true)
 Options.RaidDifficultyDropdown:OnChanged(function()
 	local Value = Options.RaidDifficultyDropdown.Value
 	DropdownConfig.Raids = DropdownConfig.Raids or {}
 	DropdownConfig.Raids.difficulty = Value
 	SaveConfig(DropdownConfig)
 end)
-
-AutoStartGroup:AddLabel("Trost: Attack Titan\nShiganshina: Armored Titan\nStohess: Female Titan", true)
 
 AutoStartGroup:AddDivider()
 
@@ -1685,6 +2116,7 @@ AutoStartGroup:AddDropdown("ModifiersDropdown", {
 	Multi = true,
 	Text = "Modifiers",
 })
+AutoStartGroup:AddLabel("Optional challenge modifiers applied at mission start.", true)
 
 -- Trigger type initialization
 task.defer(function()
@@ -1694,13 +2126,14 @@ task.defer(function()
 end)
 
 -- ==========================================
--- UPGRADES TAB : Upgrades Groupbox
+-- LOBBY › AUTOMATION TAB : Upgrades Groupbox
 -- ==========================================
 
 UpgradesGroup:AddToggle("AutoUpgradeToggle", {
 	Text = "Upgrade Gear",
 	Default = false,
 })
+UpgradesGroup:AddLabel("Automatically upgrades your gear with Gold.", true)
 Toggles.AutoUpgradeToggle:OnChanged(function()
 	getgenv().AutoUpgrade = Toggles.AutoUpgradeToggle.Value
 	if getgenv().AutoUpgrade then
@@ -1736,6 +2169,7 @@ UpgradesGroup:AddToggle("AutoEnhanceToggle", {
 	Text = "Enhance Perks",
 	Default = false,
 })
+UpgradesGroup:AddLabel("Feeds lower-rarity perks into your equipped perk.", true)
 Toggles.AutoEnhanceToggle:OnChanged(function()
 	getgenv().AutoPerk = Toggles.AutoEnhanceToggle.Value
 	if getgenv().AutoPerk then
@@ -1845,24 +2279,25 @@ UpgradesGroup:AddDropdown("PerkSlotDropdown", {
 	Multi = false,
 	Text = "Perk Slot",
 })
+UpgradesGroup:AddLabel("The equipped perk slot to enhance. Default: Body.", true)
 
 UpgradesGroup:AddDropdown("SelectPerksDropdown", {
 	Values = {"Common", "Rare", "Epic", "Legendary"},
 	Default = {},
 	Multi = true,
-	Text = "Perks to use (Food)",
+	Text = "Perks to use as Food",
 })
-
-UpgradesGroup:AddLabel("Default perk slot is Body")
+UpgradesGroup:AddLabel("Rarities of perks to sacrifice as enhancement food.", true)
 
 -- ==========================================
--- UPGRADES TAB : Skill Tree Groupbox
+-- LOBBY › AUTOMATION TAB : Skill Tree Groupbox
 -- ==========================================
 
 SkillTreeGroup:AddToggle("AutoSkillTree", {
 	Text = "Auto Skill Tree",
 	Default = false,
 })
+SkillTreeGroup:AddLabel("Automatically unlocks skill tree nodes in priority order.", true)
 Toggles.AutoSkillTree:OnChanged(function()
 	getgenv().AutoSkillTree = Toggles.AutoSkillTree.Value
 	local plrData = GetPlayerData()
@@ -1930,6 +2365,7 @@ SkillTreeGroup:AddDropdown("MiddlePathDropdown", {
 	Multi = false,
 	Text = "Middle Path",
 })
+SkillTreeGroup:AddLabel("Weapon-specific offensive skill path.", true)
 
 SkillTreeGroup:AddDropdown("LeftPathDropdown", {
 	Values = {"Regen", "Cooldown Reduction"},
@@ -1937,6 +2373,7 @@ SkillTreeGroup:AddDropdown("LeftPathDropdown", {
 	Multi = false,
 	Text = "Left Path",
 })
+SkillTreeGroup:AddLabel("Support path for sustain or cooldowns.", true)
 
 SkillTreeGroup:AddDropdown("RightPathDropdown", {
 	Values = {"Health", "Damage Reduction"},
@@ -1944,6 +2381,7 @@ SkillTreeGroup:AddDropdown("RightPathDropdown", {
 	Multi = false,
 	Text = "Right Path",
 })
+SkillTreeGroup:AddLabel("Defense path for survivability.", true)
 
 SkillTreeGroup:AddDropdown("Priority1Dropdown", {
 	Values = {"Left", "Middle", "Right", "None"},
@@ -1951,6 +2389,7 @@ SkillTreeGroup:AddDropdown("Priority1Dropdown", {
 	Multi = false,
 	Text = "Priority 1",
 })
+SkillTreeGroup:AddLabel("First path to unlock skills in.", true)
 
 SkillTreeGroup:AddDropdown("Priority2Dropdown", {
 	Values = {"Left", "Middle", "Right", "None"},
@@ -1958,6 +2397,7 @@ SkillTreeGroup:AddDropdown("Priority2Dropdown", {
 	Multi = false,
 	Text = "Priority 2",
 })
+SkillTreeGroup:AddLabel("Second path once Priority 1 is complete.", true)
 
 SkillTreeGroup:AddDropdown("Priority3Dropdown", {
 	Values = {"Left", "Middle", "Right", "None"},
@@ -1965,15 +2405,17 @@ SkillTreeGroup:AddDropdown("Priority3Dropdown", {
 	Multi = false,
 	Text = "Priority 3",
 })
+SkillTreeGroup:AddLabel("Final path, or set to None to skip.", true)
 
 -- ==========================================
--- MISC TAB : Slot Groupbox
+-- LOBBY › SETTINGS TAB : Slot Groupbox
 -- ==========================================
 
 SlotGroup:AddToggle("AutoSelectSlot", {
 	Text = "Auto Select Slot",
 	Default = false,
 })
+SlotGroup:AddLabel("Automatically selects and loads your chosen slot.", true)
 Toggles.AutoSelectSlot:OnChanged(function()
 	getgenv().AutoSlot = Toggles.AutoSelectSlot.Value
 	if getgenv().AutoSlot and not lp:GetAttribute("Slot") then
@@ -1996,11 +2438,13 @@ SlotGroup:AddDropdown("SelectSlotDropdown", {
 	Multi = false,
 	Text = "Select Slot",
 })
+SlotGroup:AddLabel("The save slot to auto-select on join.", true)
 
 SlotGroup:AddToggle("AutoPrestigeToggle", {
 	Text = "Auto Prestige",
 	Default = false,
 })
+SlotGroup:AddLabel("Automatically Prestiges after you hit the Lvl Max.", true)
 Toggles.AutoPrestigeToggle:OnChanged(function()
 	getgenv().AutoPrestige = Toggles.AutoPrestigeToggle.Value
 	if getgenv().AutoPrestige then
@@ -2039,8 +2483,9 @@ SlotGroup:AddDropdown("SelectBoostDropdown", {
 	Values = {"Luck Boost", "EXP Boost", "Gold Boost"},
 	Default = 1,
 	Multi = false,
-	Text = "Select Boost",
+	Text = "Prestige Boost",
 })
+SlotGroup:AddLabel("The boost you want to apply when prestiging.", true)
 
 SlotGroup:AddSlider("PrestigeGoldSlider", {
 	Text = "Prestige Gold (in millions)",
@@ -2049,21 +2494,23 @@ SlotGroup:AddSlider("PrestigeGoldSlider", {
 	Max = 100,
 	Rounding = 0,
 })
+SlotGroup:AddLabel("Minimum Gold required before Auto Prestige fires.", true)
 
 -- ==========================================
--- MISC TAB : Family Roll Groupbox
+-- LOBBY › SETTINGS TAB : Family Roll Groupbox
 -- ==========================================
 
 FamilyRollGroup:AddToggle("AutoRollToggle", {
 	Text = "Auto Roll",
 	Default = false,
 })
+FamilyRollGroup:AddLabel("Rolls for families until a target or rarity is hit.", true)
 Toggles.AutoRollToggle:OnChanged(function()
 	getgenv().AutoRoll = Toggles.AutoRollToggle.Value
 	if getgenv().AutoRoll then
 		if game.PlaceId ~= 13379208636 then
 			Library:Notify({
-				Title = "TITANIC HUB",
+				Title = "Tekkit Hub",
 				Description = "You must be in the lobby to use family roll features.",
 				Time = 3
 			})
@@ -2098,13 +2545,14 @@ end)
 
 FamilyRollGroup:AddInput("SelectFamily", {
 	Default = "",
-	Text = "Select Families",
+	Text = "Target Families",
 	Placeholder = "Fritz,Yeager,etc.",
 })
+FamilyRollGroup:AddLabel("Stop rolling when one of these families is hit.", true)
 Options.SelectFamily:OnChanged(function()
 	if Options.SelectFamily.Value ~= "" then
 		Library:Notify({
-			Title = "TITANIC HUB",
+			Title = "Tekkit Hub",
 			Description = "Families selected: " .. Options.SelectFamily.Value,
 			Time = 2
 		})
@@ -2115,19 +2563,19 @@ FamilyRollGroup:AddDropdown("SelectFamilyRarity", {
 	Values = familyRaritiesOptions,
 	Default = {},
 	Multi = true,
-	Text = "Stop At",
+	Text = "Stop At Rarity",
 })
-
-FamilyRollGroup:AddLabel("Mythical families won't be rolled\nSeparate families with commas & no spaces (Fritz,Yeager)", true)
+FamilyRollGroup:AddLabel("Stops rolling when this rarity or higher is obtained. Mythicals are never rolled. Separate families with commas, no spaces.", true)
 
 -- ==========================================
--- SETTINGS TAB : Webhook & UI Groupbox
+-- IN-GAME SETTINGS TAB : Settings & Webhook Groupboxes
 -- ==========================================
 
 WebhookGroup:AddToggle("ToggleRewardWebhook", {
 	Text = "Reward Webhook",
 	Default = false,
 })
+WebhookGroup:AddLabel("Sends a Discord webhook when rewards are received.", true)
 Toggles.ToggleRewardWebhook:OnChanged(function()
 	getgenv().RewardWebhook = Toggles.ToggleRewardWebhook.Value
 end)
@@ -2136,6 +2584,7 @@ WebhookGroup:AddToggle("ToggleMythicalFamilyWebhook", {
 	Text = "Mythical Family Webhook",
 	Default = false,
 })
+WebhookGroup:AddLabel("Sends a webhook when a Mythical family is rolled.", true)
 Toggles.ToggleMythicalFamilyWebhook:OnChanged(function()
 	getgenv().MythicalFamilyWebhook = Toggles.ToggleMythicalFamilyWebhook.Value
 end)
@@ -2145,6 +2594,7 @@ WebhookGroup:AddInput("WebhookUrl", {
 	Text = "Webhook URL",
 	Placeholder = "https://discord.com/api/webhooks/...",
 })
+WebhookGroup:AddLabel("Your Discord webhook URL for notifications.", true)
 Options.WebhookUrl:OnChanged(function()
 	webhook = Options.WebhookUrl.Value
 end)
@@ -2153,11 +2603,13 @@ SettingsGroup:AddToggle("AutoHideToggle", {
 	Text = "Auto Hide GUI",
 	Default = false,
 })
+SettingsGroup:AddLabel("Hides the GUI automatically after loading.", true)
 
 SettingsGroup:AddToggle("Disable3DRendering", {
 	Text = "Disable 3D Rendering (FPS Boost)",
 	Default = false,
 })
+SettingsGroup:AddLabel("Stops 3D scene rendering for a significant FPS boost.", true)
 Toggles.Disable3DRendering:OnChanged(function()
 	RunService:Set3dRenderingEnabled(not Toggles.Disable3DRendering.Value)
 end)
@@ -2165,16 +2617,25 @@ end)
 SettingsGroup:AddLabel("Menu toggle"):AddKeyPicker("MenuKeybind", { Default = "RightControl", NoUI = true, Text = "Menu keybind" })
 Library.ToggleKeybind = Options.MenuKeybind
 
+-- Keybind toggle handler
+game:GetService("UserInputService").InputBegan:Connect(function(inp, gp)
+	if gp then return end
+	if Library.ToggleKeybind and inp.KeyCode.Name == Library.ToggleKeybind.Value then
+		Library:Toggle()
+	end
+end)
+
 ThemeManager:SetLibrary(Library)
 SaveManager:SetLibrary(Library)
 
-ThemeManager:SetFolder("THUB/aotr")
-SaveManager:SetFolder("THUB/aotr")
+ThemeManager:SetFolder("UsSuite/aotr")
+SaveManager:SetFolder("UsSuite/aotr")
 
-SaveManager:BuildConfigSection(Tabs.Settings)
-ThemeManager:ApplyToTab(Tabs.Settings)
+-- Use In-Game Settings tab for config & theme
+SaveManager:BuildConfigSection(TabIGSet)
+ThemeManager:ApplyToTab(TabIGSet)
 
-ThemeManager:ApplyTheme("Jester")
+ThemeManager:ApplyTheme("Dark")
 SaveManager:LoadAutoloadConfig()
 
 Library:OnUnload(function()
@@ -2202,8 +2663,8 @@ task.spawn(function()
 	if Toggles.AutoHideToggle.Value then
 		Library:Toggle(false)
 		Library:Notify({
-			Title = "TITANIC HUB",
-			Description = "Auto Hid GUI",
+			Title = "Tekkit Hub",
+			Description = "GUI auto-hidden. Press RightControl to show.",
 			Time = 2
 		})
 	end
