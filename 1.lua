@@ -2176,7 +2176,6 @@ ThemeManager:ApplyToTab(Tabs.Settings)
 
 ThemeManager:ApplyTheme("Jester")
 SaveManager:LoadAutoloadConfig()
-
 -- ==========================================
 -- AUTO TS QUEST - GIANT FOREST ONLY (Part 3)
 -- ==========================================
@@ -2462,7 +2461,7 @@ GiantForestGroup:AddLabel("📍 Must be in GIANT FOREST map")
 GiantForestGroup:AddLabel("1. Collects 3 supply crates")
 GiantForestGroup:AddLabel("2. Defends crates from titans")
 GiantForestGroup:AddLabel("⚠️ Auto Farm must be ON")
-
+Library:OnUnload(function()
 	Library.Unloaded = true
 end)
 
