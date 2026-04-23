@@ -2177,7 +2177,7 @@ ThemeManager:ApplyToTab(Tabs.Settings)
 ThemeManager:ApplyTheme("Jester")
 SaveManager:LoadAutoloadConfig()
 -- ==========================================
--- AUTO TS QUEST - GIANT FOREST ONLY (Part 3)
+-- MOBILE OPTIMIZED - GIANT FOREST TS QUEST
 -- ==========================================
 
 getgenv().AutoGiantForestQuest = false
@@ -2207,60 +2207,164 @@ local function ResetGiantForestState()
     }
 end
 
--- Find supply crates
+-- Mobile touch interaction
+local function TouchInteract(part)
+    if not part then return false end
+    
+    -- Get the part's position on screen
+    local camera = workspace.CurrentCamera
+    local vector, onScreen = camera:WorldToScreenPoint(part.Position)
+    
+    if onScreen then
+        -- Simulate touch at that position
+        local vim = game:GetService("VirtualInputManager")
+        vim:SendMouseButtonEvent(vector.X, vector.Y, 0, true, game, 0)
+        task.wait(0.05)
+        vim:SendMouseButtonEvent(vector.X, vector.Y, 0, false, game, 0)
+        return true
+    end
+    return false
+end
+
+-- Find supply crates (mobile friendly)
 local function FindSupplyCrates()
     local crates = {}
+    
+    -- Search for crate models with Interact
     for _, obj in ipairs(workspace:GetDescendants()) do
-        -- Look for crate parts
-        if obj:IsA("BasePart") and (string.find(obj.Name, "Crate") or string.find(obj.Name, "Supply")) then
-            local parent = obj.Parent
-            -- Check if not already collected
-            if parent and not parent:GetAttribute("Collected") and not obj:GetAttribute("Collected") then
-                table.insert(crates, obj)
-            end
-        end
-        -- Also check for Interact objects
         if obj.Name == "Interact" and obj.Parent then
             local parent = obj.Parent
-            if string.find(parent.Name, "Crate") or string.find(parent.Name, "Supply") then
+            local parentName = string.lower(parent.Name or "")
+            
+            -- Check if it's a crate
+            if string.find(parentName, "crate") or 
+               string.find(parentName, "supply") or
+               parent:FindFirstChild("Handle") then
+                
+                -- Check if not already collected
                 if not parent:GetAttribute("Collected") then
-                    table.insert(crates, obj.Parent)
+                    table.insert(crates, {
+                        model = parent,
+                        interact = obj,
+                        pos = obj.Position
+                    })
                 end
             end
         end
     end
+    
+    -- Also look for parts named Crate
+    for _, part in ipairs(workspace:GetDescendants()) do
+        if part:IsA("BasePart") and string.find(string.lower(part.Name), "crate") then
+            local parent = part.Parent
+            local interact = parent and parent:FindFirstChild("Interact")
+            if interact and not parent:GetAttribute("Collected") then
+                table.insert(crates, {
+                    model = parent,
+                    interact = interact,
+                    pos = part.Position
+                })
+            end
+        end
+    end
+    
     return crates
 end
 
--- Collect a crate
-local function CollectCrate(crate)
+-- Collect crate using mobile-friendly method
+local function CollectCrate(crateData)
     local root = lp.Character and lp.Character:FindFirstChild("HumanoidRootPart")
     if not root then return false end
     
-    -- Get crate position
-    local cratePos = crate:FindFirstChild("HumanoidRootPart") and crate.HumanoidRootPart.Position or crate.Position
+    local targetPos = crateData.pos
+    local distance = (root.Position - targetPos).Magnitude
     
-    -- Move to crate
-    if (root.Position - cratePos).Magnitude > 10 then
-        root.CFrame = CFrame.new(cratePos + Vector3.new(0, 5, 0))
-        task.wait(0.5)
+    -- Move closer (mobile needs to be closer)
+    if distance > 8 then
+        root.CFrame = CFrame.new(targetPos + Vector3.new(0, 5, 2))
+        task.wait(0.3)
         return false
     end
     
-    -- Interact with crate
-    local interact = crate:FindFirstChild("Interact")
-    if interact then
-        postRemote:FireServer("Interact", "Collect", crate)
-        task.wait(1)
-        crate:SetAttribute("Collected", true)
-        return true
+    -- Face the crate
+    root.CFrame = CFrame.new(root.Position, targetPos)
+    task.wait(0.2)
+    
+    -- Try multiple interaction methods for mobile
+    local success = false
+    
+    -- Method 1: Use the Interact remote
+    pcall(function()
+        postRemote:FireServer("Interact", "Collect", crateData.model)
+        success = true
+    end)
+    
+    task.wait(0.3)
+    
+    -- Method 2: Touch the interact part
+    if not success and crateData.interact then
+        success = TouchInteract(crateData.interact)
     end
     
-    return false
+    task.wait(0.3)
+    
+    -- Method 3: Use the model's primary part
+    if not success and crateData.model then
+        local primary = crateData.model:FindFirstChild("HumanoidRootPart") or crateData.model:FindFirstChild("Handle")
+        if primary then
+            success = TouchInteract(primary)
+        end
+    end
+    
+    task.wait(1)
+    
+    -- Mark as collected
+    if crateData.model then
+        crateData.model:SetAttribute("Collected", true)
+    end
+    
+    return true
 end
 
--- Main Giant Forest quest function
-local function AutoGiantForestQuest()
+-- Check defense status
+local function CheckDefenseComplete()
+    -- Check mission objective
+    local objectiveText = ""
+    local hud = PlayerGui:FindFirstChild("Interface")
+    if hud and hud:FindFirstChild("Objective") then
+        local obj = hud.Objective:FindFirstChild("Text")
+        if obj then
+            objectiveText = obj.Text
+        end
+    end
+    
+    -- If objective says defend and timer is done
+    if string.find(objectiveText, "Defend") or string.find(objectiveText, "Protect") then
+        local seconds = workspace:GetAttribute("Seconds")
+        if seconds and seconds <= 0 then
+            return true
+        end
+    end
+    
+    -- Check if all crates are delivered
+    local allDelivered = true
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj.Name == "Interact" and obj.Parent then
+            local parent = obj.Parent
+            if string.find(string.lower(parent.Name or ""), "crate") then
+                if not parent:GetAttribute("Delivered") and not parent:GetAttribute("Collected") then
+                    allDelivered = false
+                    break
+                end
+            end
+        end
+    end
+    
+    return allDelivered
+end
+
+-- Main mobile quest function
+local function AutoGiantForestQuestMobile()
     if not getgenv().AutoGiantForestQuest then return end
     
     -- Check if already have Thunderspears
@@ -2277,98 +2381,90 @@ local function AutoGiantForestQuest()
         return
     end
     
-    -- Check if in Giant Forest map
+    -- Check if in Giant Forest
     local currentMap = workspace:GetAttribute("Map") or (mapData and mapData.Map and mapData.Map.Name)
     if currentMap ~= "Giant Forest" and currentMap ~= "GiantForest" then
-        UpdateStatus("Giant Forest Quest: Wrong map (need Giant Forest)")
+        UpdateStatus("Need Giant Forest map")
         task.wait(2)
         return
     end
     
-    -- Wait for mission to load
+    -- Wait for mission load
     if not checkMission() then
         task.wait(2)
         return
     end
     
-    -- Enable auto farm for combat
+    -- Enable auto farm
     if not AutoFarm._running then
         AutoFarm:Start()
     end
     
-    UpdateStatus("Giant Forest: Collecting crates...")
-    
-    -- Part 1: Collect 3 supply crates
-    if GiantForestState.CratesCollected < GiantForestState.TotalCrates then
+    -- PHASE 1: Collect crates
+    if GiantForestState.CratesCollected < 3 then
+        UpdateStatus(string.format("Collecting crates: %d/3", GiantForestState.CratesCollected))
+        
         local crates = FindSupplyCrates()
         
+        if #crates == 0 then
+            UpdateStatus("Looking for crates...")
+            task.wait(2)
+            return
+        end
+        
         for _, crate in ipairs(crates) do
+            if GiantForestState.CratesCollected >= 3 then break end
+            
             if CollectCrate(crate) then
                 GiantForestState.CratesCollected = GiantForestState.CratesCollected + 1
                 Library:Notify({
                     Title = "TS Quest",
-                    Description = string.format("📦 Crate %d/%d collected", GiantForestState.CratesCollected, GiantForestState.TotalCrates),
+                    Description = string.format("📦 Crate %d/3 collected!", GiantForestState.CratesCollected),
                     Time = 2
                 })
-                SaveTSQuestProgress()
                 task.wait(1)
             end
         end
         
-        -- If all crates collected
-        if GiantForestState.CratesCollected >= GiantForestState.TotalCrates then
+        if GiantForestState.CratesCollected >= 3 then
             Library:Notify({
                 Title = "TS Quest",
-                Description = "✅ All crates collected! Now defending...",
+                Description = "✅ All crates collected! Defending...",
                 Time = 3
             })
         end
         return
     end
     
-    -- Part 2: Defend crates
+    -- PHASE 2: Defense
     if not GiantForestState.DefenseComplete then
-        UpdateStatus("Giant Forest: Defending crates...")
+        UpdateStatus("Defending crates...")
         
-        -- Find defense area
-        local defensePoint = nil
-        for _, obj in ipairs(workspace:GetDescendants()) do
-            if obj.Name == "DefensePoint" or obj.Name == "DefendArea" or (obj:IsA("Part") and string.find(obj.Name, "Defend")) then
-                defensePoint = obj
-                break
-            end
-        end
-        
-        -- Stay in defense area
+        -- Stay in the area
         local root = lp.Character and lp.Character:FindFirstChild("HumanoidRootPart")
-        if root and defensePoint then
-            local defendPos = defensePoint.Position
-            if (root.Position - defendPos).Magnitude > 30 then
-                root.CFrame = CFrame.new(defendPos + Vector3.new(0, 15, 0))
+        if root then
+            -- Find center of map to defend
+            local center = Vector3.new(0, 50, 0)
+            for _, obj in ipairs(workspace:GetDescendants()) do
+                if obj:IsA("BasePart") and obj.Name == "SpawnLocation" then
+                    center = obj.Position + Vector3.new(0, 30, 0)
+                    break
+                end
+            end
+            
+            if (root.Position - center).Magnitude > 50 then
+                root.CFrame = CFrame.new(center)
             end
         end
         
-        -- Check if defense is complete
-        local objectiveComplete = workspace:GetAttribute("Objective_Complete") 
-            or workspace:GetAttribute("Defense_Complete")
-            or (workspace:GetAttribute("Seconds") and workspace:GetAttribute("Seconds") >= 60)
-        
-        -- Also check UI objective
-        local objectiveText = GetCurrentObjective()
-        if objectiveText and (string.find(objectiveText, "Defend") or string.find(objectiveText, "Protect")) then
-            if workspace:GetAttribute("Seconds") and workspace:GetAttribute("Seconds") <= 0 then
-                objectiveComplete = true
-            end
-        end
-        
-        if objectiveComplete then
+        -- Check if defense complete
+        if CheckDefenseComplete() then
             GiantForestState.DefenseComplete = true
             Library:Notify({
                 Title = "TS Quest",
                 Description = "🎉 THUNDERSPEARS UNLOCKED! 🎉",
                 Time = 5
             })
-            SaveTSQuestProgress()
             getgenv().AutoGiantForestQuest = false
             if Library.Toggles.AutoGiantForestToggle then
                 Library.Toggles.AutoGiantForestToggle:SetValue(false)
@@ -2377,30 +2473,19 @@ local function AutoGiantForestQuest()
     end
 end
 
--- Start the loop
+-- Start loop
 task.spawn(function()
     while true do
-        pcall(AutoGiantForestQuest)
+        pcall(AutoGiantForestQuestMobile)
         task.wait(1)
     end
 end)
 
--- Save progress periodically
-task.spawn(function()
-    while true do
-        task.wait(30)
-        if getgenv().AutoGiantForestQuest then
-            SaveTSQuestProgress()
-        end
-    end
-end)
-
 -- ==========================================
--- UI BUTTONS
+-- UI (Mobile friendly - bigger buttons)
 -- ==========================================
 
--- Add to Main tab
-local GiantForestGroup = Tabs.Main:AddLeftGroupbox("🌲 Giant Forest TS Quest")
+local GiantForestGroup = Tabs.Main:AddLeftGroupbox("🌲 Giant Forest TS Quest (Mobile)")
 
 GiantForestGroup:AddToggle("AutoGiantForestToggle", {
     Text = "Auto Complete Giant Forest (Part 3)",
@@ -2414,9 +2499,9 @@ Toggles.AutoGiantForestToggle:OnChanged(function()
             Toggles.AutoKillToggle:SetValue(true)
         end
         Library:Notify({
-            Title = "TS Quest",
-            Description = "Auto Giant Forest Quest Started! Will collect 3 crates and defend.",
-            Time = 4
+            Title = "Mobile TS Quest",
+            Description = "Auto collecting crates!",
+            Time = 3
         })
     end
 end)
@@ -2425,16 +2510,11 @@ GiantForestGroup:AddButton({
     Text = "Reset Progress",
     Func = function()
         ResetGiantForestState()
-        SaveTSQuestProgress()
-        Library:Notify({
-            Title = "TS Quest",
-            Description = "Progress reset!",
-            Time = 2
-        })
+        Library:Notify({Title = "Reset", Description = "Progress reset!", Time = 2})
     end,
 })
 
--- Status label
+-- Status
 local GFStatusLabel = GiantForestGroup:AddLabel("Status: Waiting...")
 
 task.spawn(function()
@@ -2443,11 +2523,11 @@ task.spawn(function()
             if HasThunderspears() then
                 GFStatusLabel:SetText("✅ Thunderspears UNLOCKED!")
             elseif GiantForestState.DefenseComplete then
-                GFStatusLabel:SetText("✅ Complete! Thunderspears unlocked!")
+                GFStatusLabel:SetText("✅ Complete!")
             elseif GiantForestState.CratesCollected < 3 then
-                GFStatusLabel:SetText(string.format("📦 Collecting crates: %d/3", GiantForestState.CratesCollected))
+                GFStatusLabel:SetText(string.format("📦 Crates: %d/3", GiantForestState.CratesCollected))
             else
-                GFStatusLabel:SetText("🛡️ Defending crates...")
+                GFStatusLabel:SetText("🛡️ Defending...")
             end
         else
             GFStatusLabel:SetText("⚙️ Disabled")
@@ -2456,11 +2536,12 @@ task.spawn(function()
     end
 end)
 
-GiantForestGroup:AddLabel("━━━━━━━━━━━━━━━━━━━━")
-GiantForestGroup:AddLabel("📍 Must be in GIANT FOREST map")
-GiantForestGroup:AddLabel("1. Collects 3 supply crates")
-GiantForestGroup:AddLabel("2. Defends crates from titans")
-GiantForestGroup:AddLabel("⚠️ Auto Farm must be ON")
+GiantForestGroup:AddLabel("━━━━━━━━━━━━━━━━")
+GiantForestGroup:AddLabel("📍 Mobile optimized")
+GiantForestGroup:AddLabel("1. Auto finds crates")
+GiantForestGroup:AddLabel("2. Auto collects")
+GiantForestGroup:AddLabel("3. Auto defends")
+GiantForestGroup:AddLabel("⚠️ Enable Auto Farm")
 Library:OnUnload(function()
 	Library.Unloaded = true
 end)
