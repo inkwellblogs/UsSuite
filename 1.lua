@@ -113,6 +113,7 @@ getgenv().RewardWebhook = false
 getgenv().MythicalFamilyWebhook = false
 getgenv().AutoReturnLobby = false
 getgenv().OpenSecondChest = false
+getgenv().AutoTSQuest = false
 getgenv().DeleteMap = DropdownConfig.DeleteMap or false
 if not isfile(returnCounterPath) then writefile(returnCounterPath, "0") end
 
@@ -593,6 +594,141 @@ function AutoFarm:Start()
 end
 
 function AutoFarm:Stop()
+	self._running = false
+end
+
+-- ==========================================
+-- AUTO TS QUEST : Giant Forest Supply Runner
+-- ==========================================
+
+local TSQuest = {}
+TSQuest._running = false
+
+function TSQuest:Start()
+	if self._running then return end
+	if isLobby then return end
+	self._running = true
+
+	task.spawn(function()
+		UpdateStatus("TS Quest: Starting...")
+
+		while self._running do
+			local char = lp.Character
+			local hrp = char and char:FindFirstChild("HumanoidRootPart")
+			if not hrp then task.wait(0.5); continue end
+
+			-- Disable collisions to avoid getting stuck
+			for _, p in ipairs(char:GetDescendants()) do
+				if p:IsA("BasePart") then p.CanCollide = false end
+			end
+
+			local unclimbable = workspace:FindFirstChild("Unclimbable")
+			if not unclimbable then
+				UpdateStatus("TS Quest: Waiting for map...")
+				task.wait(1)
+				continue
+			end
+
+			-- Collect all ThunderSpear_Supplies models
+			local supplies = {}
+			for _, v in ipairs(unclimbable:GetChildren()) do
+				if v.Name:match("^ThunderSpear_Supplies%d+$") then
+					table.insert(supplies, v)
+				end
+			end
+
+			if #supplies == 0 then
+				UpdateStatus("TS Quest: Waiting for supplies to spawn...")
+				task.wait(1)
+				continue
+			end
+
+			-- Sort supplies 1 → 2 → 3
+			table.sort(supplies, function(a, b)
+				local na = tonumber(a.Name:match("%d+$")) or 0
+				local nb = tonumber(b.Name:match("%d+$")) or 0
+				return na < nb
+			end)
+
+			-- ─── Phase 1: Collect each crate ───
+			for _, supply in ipairs(supplies) do
+				if not self._running then break end
+				if not supply or not supply.Parent then continue end
+
+				local hitbox = supply:FindFirstChild("Hitbox")
+				local crateBox = supply:FindFirstChild("CrateBox")
+				local target = hitbox or crateBox
+				if not target then continue end
+
+				UpdateStatus("TS Quest: Collecting " .. supply.Name .. "...")
+
+				local targetPos = target.Position + Vector3.new(0, 3, 0)
+
+				-- Keep teleporting to the crate until it's gone (collected) or timeout
+				local t0 = os.clock()
+				while self._running and supply.Parent and (os.clock() - t0) < 6 do
+					hrp.CFrame = CFrame.new(targetPos)
+					hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+					-- Try firing the interaction remote just in case game uses it
+					pcall(function()
+						postRemote:FireServer("Objectives", "Interact", target)
+					end)
+					pcall(function()
+						postRemote:FireServer("Supply", "Collect", supply)
+					end)
+					task.wait(0.15)
+				end
+
+				task.wait(0.2)
+			end
+
+			-- ─── Phase 2: Go to Points ───
+			-- Points folder lives in the last supply model (ThunderSpear_Supplies3)
+			local pointsFolder = nil
+			for _, v in ipairs(unclimbable:GetChildren()) do
+				if v.Name:match("^ThunderSpear_Supplies") then
+					local pts = v:FindFirstChild("Points")
+					if pts then pointsFolder = pts; break end
+				end
+			end
+
+			if pointsFolder then
+				UpdateStatus("TS Quest: Moving to Points...")
+				-- Iterate every BasePart inside Points folder
+				local pointParts = {}
+				for _, p in ipairs(pointsFolder:GetDescendants()) do
+					if p:IsA("BasePart") then table.insert(pointParts, p) end
+				end
+				if #pointParts == 0 then
+					-- pointsFolder itself might be a BasePart
+					if pointsFolder:IsA("BasePart") then
+						table.insert(pointParts, pointsFolder)
+					end
+				end
+
+				for _, pt in ipairs(pointParts) do
+					if not self._running then break end
+					local t0 = os.clock()
+					while self._running and (os.clock() - t0) < 5 do
+						hrp.CFrame = CFrame.new(pt.Position + Vector3.new(0, 3, 0))
+						hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+						task.wait(0.15)
+					end
+				end
+			else
+				UpdateStatus("TS Quest: No Points found, holding position...")
+				task.wait(2)
+			end
+
+			UpdateStatus("TS Quest: Cycle complete, looping...")
+			task.wait(1)
+		end
+
+		UpdateStatus("TS Quest: Stopped.")
+	end)
+end
+
+function TSQuest:Stop()
 	self._running = false
 end
 
@@ -1392,6 +1528,25 @@ Toggles.AutoReturnLobbyToggle:OnChanged(function()
 		pcall(function() writefile(returnCounterPath, "0") end)
 	end
 end)
+
+MainGroup:AddDivider()
+
+MainGroup:AddLabel("⚡ Thunder Spear Quest (Giant Forest)", true)
+
+MainGroup:AddToggle("AutoTSQuestToggle", {
+	Text = "Auto TS Quest (Supply Collector)",
+	Default = false,
+})
+Toggles.AutoTSQuestToggle:OnChanged(function()
+	getgenv().AutoTSQuest = Toggles.AutoTSQuestToggle.Value
+	if getgenv().AutoTSQuest then
+		TSQuest:Start()
+	else
+		TSQuest:Stop()
+	end
+end)
+
+MainGroup:AddLabel("Auto collects ThunderSpear crates\n& stands on Points in Giant Forest.", true)
 
 MainGroup:AddLabel("Failsafe tps you back to lobby\nafter a timeout.")
 
