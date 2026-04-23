@@ -122,121 +122,7 @@ function UpdateStatus(text)
 		getgenv().CurrentStatusLabel:SetText("Status: " .. text) 
 	end
 end
---[[
-    COMPLETE THUNDER SPEAR QUEST AUTOMATION
-    Place this code near your other automation functions (around line 900)
-    and ensure the UI toggle is added to your MISC tab.
---]]
 
--- Add this near the other config variables (around line 120)
-getgenv().AutoThunderSpearQuest = false
-
--- Core quest automation logic
-local function handleThunderSpearQuest()
-    if not getgenv().AutoThunderSpearQuest then return end
-    
-    local questUI = INTERFACE:FindFirstChild("Quest")
-    if not questUI or not questUI.Visible then return end
-    
-    local questTitle = questUI:FindFirstChild("Title")
-    if not questTitle or not string.find(questTitle.Text, "Thunder Spear") then return end
-
-    -- Determine current quest step based on title/description
-    local description = questUI:FindFirstChild("Description") 
-    local descText = description and description.Text or ""
-    local titleText = questTitle.Text
-
-    local function isQuestStep(text, keywords)
-        for _, kw in ipairs(keywords) do
-            if string.find(string.lower(text), string.lower(kw)) then return true end
-        end
-        return false
-    end
-
-    -- Step 1: Build Towers in Outskirts
-    if isQuestStep(titleText .. descText, {"Build", "Tower", "Outskirts"}) then
-        UpdateStatus("TS Quest: Building Towers...")
-        local buildZones = workspace:FindFirstChild("Unclimbable") and workspace.Unclimbable:FindFirstChild("BuildZones")
-        if buildZones then
-            for _, zone in ipairs(buildZones:GetChildren()) do
-                if zone:IsA("BasePart") and zone.BrickColor == BrickColor.new("Lime green") then
-                    local root = lp.Character and lp.Character:FindFirstChild("HumanoidRootPart")
-                    if root then
-                        root.AssemblyLinearVelocity = Vector3.new(0,0,0)
-                        root.CFrame = zone.CFrame + Vector3.new(0, 5, 0)
-                        task.wait(5) -- Wait for build progress
-                    end
-                end
-            end
-        end
-        return
-    end
-
-    -- Step 2: Escort the Carriage
-    if isQuestStep(titleText .. descText, {"Escort", "Carriage"}) then
-        UpdateStatus("TS Quest: Escorting Carriage...")
-        local carriage = workspace:FindFirstChild("Unclimbable") and workspace.Unclimbable:FindFirstChild("Carriage")
-        if carriage then
-            local root = lp.Character and lp.Character:FindFirstChild("HumanoidRootPart")
-            if root then
-                local targetPos = carriage.Position + Vector3.new(0, 20, 0)
-                root.AssemblyLinearVelocity = Vector3.new(0,0,0)
-                root.CFrame = CFrame.new(targetPos)
-            end
-        end
-        return
-    end
-
-    -- Step 3: Collect Ice Burst Stones in Utgard
-    if isQuestStep(titleText .. descText, {"Ice Burst"}) then
-        UpdateStatus("TS Quest: Farming Ice Burst Stones...")
-        -- This part relies on the main Auto Farm to kill Ice Burst Giants.
-        -- We just ensure we are in the right mode.
-        if not getgenv().AutoKillToggle or not AutoFarm._running then
-            Library:Notify({ Title = "TS Quest", Description = "Enable Auto Farm to collect stones.", Time = 3 })
-        end
-        return
-    end
-
-    -- Step 4: Giant Forest - Collect Crates & Defend
-    if isQuestStep(titleText .. descText, {"Giant Forest", "Supply", "Crate"}) then
-        local crates = workspace:FindFirstChild("Unclimbable") and workspace.Unclimbable:FindFirstChild("SupplyCrates")
-        local root = lp.Character and lp.Character:FindFirstChild("HumanoidRootPart")
-
-        if crates and #crates:GetChildren() > 0 and root then
-            -- Phase A: Collect Crates
-            UpdateStatus("TS Quest: Collecting Crates...")
-            local crate = crates:GetChildren()[1]
-            root.CFrame = crate.CFrame + Vector3.new(0, 10, 0)
-            task.wait(2) 
-        else
-            -- Phase B: Defend the Stash (After crates are collected, they despawn)
-            UpdateStatus("TS Quest: Defending Stash...")
-            -- Rely on Auto Farm to kill titans. We just hover near the center.
-            local stash = workspace:FindFirstChild("Unclimbable") and workspace.Unclimbable:FindFirstChild("Stash")
-            if stash and root then
-                root.CFrame = stash.CFrame + Vector3.new(0, 30, 0)
-                root.AssemblyLinearVelocity = Vector3.new(0,0,0)
-            end
-        end
-        return
-    end
-    
-    -- Check for claim button
-    local claimButton = questUI:FindFirstChild("Claim")
-    if claimButton and claimButton.Visible then
-        UseButton(claimButton)
-        Library:Notify({ Title = "Thunder Spear Quest", Description = "Step Complete! Reward claimed.", Time = 3 })
-    end
-end
-
--- Add this to your high-frequency polling loop (around line 1400)
-task.spawn(function()
-    while true do
-        pcall(handleThunderSpearQuest)
-        task.wait(2) -- Check every 2 seconds
-    end
-end)
 
 local AutoFarm = {}
 AutoFarm._running = false
@@ -661,7 +547,7 @@ function AutoFarm:Start()
 					if slotData.Weapon == "Blades" then
 						postRemote:FireServer("Attacks", "Slash", true)
 						postRemote:FireServer("Hitboxes", "Register", targetPart, math.random(625, 850))
-					else			
+					else
 						local isBoss = bossNames[targetPart.Parent.Parent.Parent.Name]
 						local text = PlayerGui.Interface.HUD.Main.Top.Spears.Spears.Text
 						local currentAmmo, maxAmmo = string.match(text, "(%d+)%s*/%s*(%d+)")
@@ -2167,19 +2053,6 @@ SlotGroup:AddSlider("PrestigeGoldSlider", {
 -- ==========================================
 -- MISC TAB : Family Roll Groupbox
 -- ==========================================
--- Add to your MISC tab (around line 2400)
-local QuestGroup = Tabs.Misc:AddLeftGroupbox("Quest Automation")
-QuestGroup:AddToggle("AutoThunderSpearQuestToggle", {
-    Text = "Auto Thunder Spear QUESTLINE",
-    Default = false,
-})
-Toggles.AutoThunderSpearQuestToggle:OnChanged(function()
-    getgenv().AutoThunderSpearQuest = Toggles.AutoThunderSpearQuestToggle.Value
-    if getgenv().AutoThunderSpearQuest then
-        Library:Notify({ Title = "Auto Quest", Description = "Multi-step TS quest started. Ensure Auto Farm is ON.", Time = 3 })
-    end
-end)
-QuestGroup:AddLabel("Prestige 1 required. Will do all steps.", true)
 
 FamilyRollGroup:AddToggle("AutoRollToggle", {
 	Text = "Auto Roll",
