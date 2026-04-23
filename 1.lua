@@ -38,8 +38,6 @@ local function GetPlayerData()
 	return lastPlayerData
 end
 
--- Map data and plr data don't update when I call them so I only need to call them when i need them, not in a loop
-
 local mapData = nil
 
 local startLoadTime = os.clock()
@@ -49,10 +47,9 @@ repeat
     task.wait(1)
     mapData = getRemote:InvokeServer("Data", "Copy")
     if not mapData then
-        lastPlayerData = nil -- force refresh (bypass cache)
+        lastPlayerData = nil
         GetPlayerData()
     end
-    -- If we're not in the lobby, we should wait longer for mapData to populate
 until mapData ~= nil or (lastPlayerData ~= nil and (isLobby or os.clock() - startLoadTime > 15))
 
 if mapData then
@@ -60,6 +57,7 @@ if mapData then
 		repeat task.wait() until workspace:GetAttribute("Finalised")
 	end
 end
+
 local function checkMission()
 	local activeType = workspace:GetAttribute("Type")
 	if activeType then return true end
@@ -75,7 +73,7 @@ local familyRaritiesOptions = {
 	"Mythical"
 }
 
--- Config system for persistent dropdown state
+-- Config system
 if not isfolder("./THUH") then makefolder("./THUB") end
 if not isfolder("./THUB/aotr") then makefolder("./THUB/aotr") end
 
@@ -119,10 +117,9 @@ if not isfile(returnCounterPath) then writefile(returnCounterPath, "0") end
 getgenv().CurrentStatusLabel = nil
 function UpdateStatus(text)
 	if getgenv().CurrentStatusLabel then 
-		getgenv().CurrentStatusLabel:Set("Status: " .. text)
+		getgenv().CurrentStatusLabel:Set("🔹 Status: " .. text)
 	end
 end
-
 
 local AutoFarm = {}
 AutoFarm._running = false
@@ -135,7 +132,6 @@ getgenv().AutoFarmConfig = {
 	HeightOffset = 250,
 	MovementMode = "Hover",
 }
-
 
 getgenv().MasteryFarmConfig = {
 	Enabled = false,
@@ -157,9 +153,7 @@ end)
 function AutoFarm:Start()
 	if self._running then return end
 	
-	if isLobby then
-		return
-	end
+	if isLobby then return end
 
 	self._running = true
 	task.spawn(function()
@@ -190,10 +184,10 @@ function AutoFarm:Start()
 
 		local startTime = os.clock()
 		while self._running and not checkReady() do
-			if os.clock() - startTime > 10 then -- Notify every 10s if still waiting
+			if os.clock() - startTime > 10 then
 				Rayfield:Notify({
 					Title = "TITANIC HUB",
-					Content = "Still waiting for mission assets to load...",
+					Content = "⏳ Waiting for mission assets to load...",
 					Duration = 5,
 					Image = 4483362458,
 				})
@@ -203,19 +197,12 @@ function AutoFarm:Start()
 		end
 
 		if not self._running then return end
-		UpdateStatus("Farming")
+		UpdateStatus("⚔️ Farming")
 
 		local titansFolder = workspace:FindFirstChild("Titans")
 		local lastAttack = 0
 		local currentChar, root, charParts = nil, nil, {}
-
-		-- INTERFACE.ChildAdded:Connect(function(v)
-		-- 	if tonumber(v.Name) then
-		-- 		v:Destroy()
-		-- 	end
-		-- end)
 		
-		-- Hash map for faster O(1) lookups
 		local bossNames = {Attack_Titan = true, Armored_Titan = true, Female_Titan = true}
 		local attackTitanSpawnTime = nil
 		local AttackRangeSq = getgenv().AutoFarmConfig.AttackRange * getgenv().AutoFarmConfig.AttackRange
@@ -276,13 +263,12 @@ function AutoFarm:Start()
 			end
 
 			if getgenv().AutoFailsafe then
-				-- Track mission start time
 				if not self.missionStartTime then
 					self.missionStartTime = os.clock()
 				end
 				
 				local missionElapsedTime = os.clock() - self.missionStartTime
-				if missionElapsedTime >= 900 then  -- 15 minutes (900 seconds)
+				if missionElapsedTime >= 900 then
 					self:Stop()
 					task.spawn(function() getRemote:InvokeServer("Functions", "Teleport", "Lobby") end)
 					task.wait(0.5)
@@ -302,22 +288,18 @@ function AutoFarm:Start()
 			
 			if not updateCharState() then task.wait(); continue end
 
-			-- CRITICAL: Refresh titansFolder to see new spawns
 			titansFolder = workspace:FindFirstChild("Titans") or titansFolder
 
-			-- Map and Folder Paths
-			local ws_ObjectiveFolder = workspace:FindFirstChild("Unclimbable") and workspace.Unclimbable:FindFirstChild("Objective") -- contains models of for example armored_boss or like female titan
-			local rs_ObjectiveFolder = ReplicatedStorage:FindFirstChild("Objectives") -- this contains the objective intvalues (displayed in gui)
+			local ws_ObjectiveFolder = workspace:FindFirstChild("Unclimbable") and workspace.Unclimbable:FindFirstChild("Objective")
+			local rs_ObjectiveFolder = ReplicatedStorage:FindFirstChild("Objectives")
 			local mapType = workspace:GetAttribute("Type") or (mapData and mapData.Map and mapData.Map.Type)
 
-			-- Armored Raid Detection
 			local isArmoredRaid = ws_ObjectiveFolder:FindFirstChild("Armored_Boss")
 			local isFemaleRaid = rs_ObjectiveFolder:FindFirstChild("Defeat_Annie")
 			local femaleExists = ws_ObjectiveFolder:FindFirstChild("Female_Boss")
 			local attackExists = ws_ObjectiveFolder:FindFirstChild("Attack_Boss")
 			local hasReinerObjective = rs_ObjectiveFolder:FindFirstChild("Defeat_Reiner")
 
-			-- Stohess Transition Pause: Only if it IS a female raid and bosses are missing
 			if isFemaleRaid and not femaleExists and not attackExists then
 				task.wait()
 				continue
@@ -329,7 +311,6 @@ function AutoFarm:Start()
 			end
 
 			local now = os.clock()
-
 			local isShifted = currentChar and currentChar:GetAttribute("Shifter") or false
 			
 			if getgenv().MasteryFarmConfig.Enabled then
@@ -343,9 +324,10 @@ function AutoFarm:Start()
 					continue
 				end
 			end
+
 			if now >= nextTitanCacheUpdate then
 				nextTitanCacheUpdate = now + 0.1
-				table.clear(validNapes) -- Reuse memory
+				table.clear(validNapes)
 				for _, v in ipairs(titansFolder:GetChildren()) do
 					if v:GetAttribute("Killed") then continue end
 					local hit = v:FindFirstChild("Hitboxes") and v.Hitboxes:FindFirstChild("Hit")
@@ -380,7 +362,6 @@ function AutoFarm:Start()
 				objectiveFound = true
 			end
 
-			-- Range limit logic: Only for Phase 1 of Armored Raid
 			local useRangeLimit = objectiveFound and isArmoredRaid and not hasReinerObjective
 			local closestDist, closestNape = math.huge, nil
 			local closestIsBoss = false
@@ -388,8 +369,6 @@ function AutoFarm:Start()
 			local attackTitanFound = false
 			local highestZ = -math.huge
 			local isStall = mapData and mapData.Map and mapData.Map.Objective == "Stall"
-
-
 			local bossIsRoaring = false
 
 			for i = 1, #validNapes do
@@ -403,7 +382,6 @@ function AutoFarm:Start()
 				local tName = titanModel.Name
 				local isBoss = bossNames[tName]
 
-				-- Boss Phase logic: Skip Armored Titan ONLY during Protect phase
 				if isArmoredRaid and not hasReinerObjective and tName == "Armored_Titan" then continue end
 		
 				if isBoss and not titanModel:GetAttribute("State") then continue end
@@ -416,7 +394,6 @@ function AutoFarm:Start()
 				local dz = referencePos.Z - nape.Position.Z
 				local d = dx*dx + dz*dz
 				
-				-- Hysteresis: Keep target lock-on
 				local adjustedDist = d
 				if getgenv()._currentTargetNape == nape then
 					adjustedDist = adjustedDist - 15000
@@ -447,18 +424,14 @@ function AutoFarm:Start()
 				end
 			end
 
-
 			local targetPart = bossHitPoint or closestNape
 			local targetIsRoaring = (targetPart ~= nil and targetPart == bossHitPoint) and bossIsRoaring or false
 			
-			-- Priotize clearing regular titans near objective if range limit is on
 			if useRangeLimit and closestNape then
 				targetPart = closestNape
 				targetIsRoaring = false
 			end
-
 			
-			-- Keep last titan alive for at least 29 seconds
 			if targetPart and #validNapes == 1 and mapType == "Missions" and (workspace:GetAttribute("Seconds") or 0) < 29 then
 				targetPart = nil
 			end
@@ -474,8 +447,8 @@ function AutoFarm:Start()
 			local attackTitanReady = not attackTitanFound or (attackTitanSpawnTime and (now - attackTitanSpawnTime) >= 5)
 
 			if targetPart then
-				UpdateStatus(closestIsBoss and "Attacking Boss..." or "Farming Titans...")
-				-- Traverse up to find the root Titan Model cleanly
+				UpdateStatus(closestIsBoss and "👊 Attacking Boss..." or "⚔️ Farming Titans...")
+				
 				local currentTitanModel = targetPart
 				while currentTitanModel and currentTitanModel.Parent ~= titansFolder do
 					currentTitanModel = currentTitanModel.Parent
@@ -518,12 +491,9 @@ function AutoFarm:Start()
 					continue
 				end
 
-				-- Calculate position (You can add extra height here if needed to avoid the roar hitbox)
-				-- Use Titan HRP CFrame to stay in a stable position relative to the body (stops spinning)
 				local titanHRP = currentTitanModel:FindFirstChild("HumanoidRootPart")
 				local targetHeightPos
 				if titanHRP then
-					-- This puts you at the HeightOffset above, and 30 studs BEHIND the Titan
 					targetHeightPos = (titanHRP.CFrame * CFrame.new(0, getgenv().AutoFarmConfig.HeightOffset, 30)).Position
 				else
 					targetHeightPos = targetPart.Position + Vector3.new(0, getgenv().AutoFarmConfig.HeightOffset, 0)
@@ -565,7 +535,6 @@ function AutoFarm:Start()
 								getRemote:InvokeServer("Spears", "S_Fire", tostring(currentAmmo))
 								local afterAmmo = getAmmo()
 
-								-- Retry if ammo didn't decrement (anti-lag)
 								if afterAmmo and beforeAmmo and afterAmmo == beforeAmmo then
 									for j = maxAmmo, 1, -1 do
 										local prevAmmo = getAmmo()
@@ -575,7 +544,6 @@ function AutoFarm:Start()
 									end
 								end
 								
-								-- Bosses take more damage / rapid fire
 								local loops = isBoss and 30 or 1
 								for j = 1, loops do
 									postRemote:FireServer("Spears", "S_Explode", targetPart.Position)
@@ -596,6 +564,9 @@ end
 function AutoFarm:Stop()
 	self._running = false
 end
+
+-- [Rest of the helper functions remain same - formatTable, formatItems, Perks, Talents, etc.]
+-- [I'll keep them exactly as they were in the original converted script]
 
 local function formatTable(tbl)
 	local str = ""
@@ -631,14 +602,14 @@ if rewards then
 	rewards:GetPropertyChangedSignal("Visible"):Connect(function()
 		if not rewards.Visible then return end
 
-	gamesPlayed = gamesPlayed + 1
+		gamesPlayed = gamesPlayed + 1
 		writefile("./THUB/aotr/games_played.txt", tostring(gamesPlayed))
 
 		local gamesUntilReturn = tonumber(readfile(returnCounterPath)) or 0
 		local willReturn = false
 
 		if getgenv().AutoReturnLobby then
-	gamesUntilReturn = gamesUntilReturn + 1
+			gamesUntilReturn = gamesUntilReturn + 1
 
 			if gamesUntilReturn >= 10 then
 				gamesUntilReturn = 0
@@ -657,14 +628,12 @@ if rewards then
 				return
 			end
 		elseif gamesUntilReturn >= 10 then
-			-- safety reset
 			gamesUntilReturn = 0
 			writefile(returnCounterPath, "0")
 		end
 		
 		if not getgenv().RewardWebhook then return end
 		
-		-- Wait for stats to populate properly (check for non-zero or non-placeholder)
 		local start = os.clock()
 		local hasData
 		repeat 
@@ -683,14 +652,12 @@ if rewards then
 		data.Items = {}
 		data.Special = {}
 
-		-- Capture Stats from UI
 		for i, v in ipairs(statsFrame:GetChildren()) do
 			if v:IsA("Frame") and v:FindFirstChild("Stat") and v:FindFirstChild("Amount") then
 				data.Stats[string.gsub(v.Name, "_", " ")] = v.Amount.Text
 			end
 		end
 
-		-- Capture Items from UI
 		for i, v in ipairs(itemsFrame:GetChildren()) do
 			if v:IsA("Frame") and v:FindFirstChild("Main") then
 				local inner = v.Main:FindFirstChild("Inner")
@@ -728,57 +695,49 @@ if rewards then
 		
 		if webhook and webhook ~= "" then
 			local payload = {
-					content = hasSpecial and "MYTHICAL DROP! @everyone" or nil,
-					embeds = {{
-						title = "TH Rewards",
-						color = hasSpecial and 0xff0000 or 0x2b2d31,
-
-
-						fields = {
-							{
-							name = "Information",
-							value =
-								"```\n" ..
+				content = hasSpecial and "🌟 MYTHICAL DROP! @everyone" or nil,
+				embeds = {{
+					title = "🎯 TH Rewards",
+					color = hasSpecial and 0xff0000 or 0x2b2d31,
+					fields = {
+						{
+							name = "📋 Information",
+							value = "```\n" ..
 								"User: " .. lp.Name .. "\n" ..
 								"Games Played: " .. tostring(gamesPlayed) .. "\n" ..
-								"Executor: " .. executor ..
-								"\n```",
+								"Executor: " .. executor .. "\n```",
 							inline = true
-							},
-							{
-								name = "Total Stats",
-								value =
-									"```\n" ..
-									"Level : " .. tostring(data.Total.Level or "1") .. "\n" ..
-									"Gold  : " .. tostring(data.Total.Gold or "0") .. "\n" ..
-									"Gems  : " .. tostring(data.Total.Gems or "0") ..
-									"\n```",
-								inline = true
-							},
-							{
-								name = "Combat",
-								value = "```\n" .. formatTable(data.Stats) .. "\n```",
-								inline = true
-							},
-							{
-								name = "Rewards",
-								value = "```\n" .. formatItems(data.Items) .. "\n```",
-								inline = true
-							},
-							{
-								name = "Special",
-								value = "```\n" .. (hasSpecial and formatItems(data.Special) or "None") .. "\n```",
-								inline = true
-							}
 						},
-
-						footer = {
-							text = "TITANIC HUB • " .. DateTime.now():FormatLocalTime("LTS", "en-us")
+						{
+							name = "📊 Total Stats",
+							value = "```\n" ..
+								"Level : " .. tostring(data.Total.Level or "1") .. "\n" ..
+								"Gold  : " .. tostring(data.Total.Gold or "0") .. "\n" ..
+								"Gems  : " .. tostring(data.Total.Gems or "0") .. "\n```",
+							inline = true
 						},
-
-						timestamp = DateTime.now():ToIsoDate()
-					}}
-				}
+						{
+							name = "⚔️ Combat",
+							value = "```\n" .. formatTable(data.Stats) .. "\n```",
+							inline = true
+						},
+						{
+							name = "🎁 Rewards",
+							value = "```\n" .. formatItems(data.Items) .. "\n```",
+							inline = true
+						},
+						{
+							name = "💎 Special",
+							value = "```\n" .. (hasSpecial and formatItems(data.Special) or "None") .. "\n```",
+							inline = true
+						}
+					},
+					footer = {
+						text = "TITANIC HUB • " .. DateTime.now():FormatLocalTime("LTS", "en-us")
+					},
+					timestamp = DateTime.now():ToIsoDate()
+				}}
+			}
 
 			request({
 				Url = webhook,
@@ -789,6 +748,8 @@ if rewards then
 		end
 	end)
 end
+
+-- [All Perks, Talents, SkillPaths etc. remain exactly same]
 local Perks = {
 	Legendary = {
 		"Peerless Commander","Indefatigable","Tyrant's Stare","Invincible","Eviscerate",
@@ -936,7 +897,7 @@ local function UseButton(button)
 
 	GuiService.SelectedObject = button
 	task.wait(0.05)
-	vim:SendKeyEvent(true, Enum.KeyCode.Return, false, game) -- same here
+	vim:SendKeyEvent(true, Enum.KeyCode.Return, false, game)
 	vim:SendKeyEvent(false, Enum.KeyCode.Return, false, game)
 
 	return true
@@ -965,7 +926,6 @@ local function DeleteMap()
 	end)
 end
 
--- Auto execute: queue once when toggled on
 local function setupAutoExecute()
 	if getgenv().AutoExecute and not getgenv().AutoExec then
 		getgenv().AutoExec = true
@@ -1033,7 +993,6 @@ local function roll(targets, rarities)
 
 	if stopRolling then
 		getgenv().AutoRoll = false
-		-- Toggles reference set after UI loads; guard with pcall
 		pcall(function()
 			if Rayfield and Rayfield.Flags and Rayfield.Flags.AutoRollToggle then
 				Rayfield.Flags.AutoRollToggle:Set(false)
@@ -1042,17 +1001,16 @@ local function roll(targets, rarities)
 
 		if familyRarity == "mythical" and getgenv().MythicalFamilyWebhook and webhook and webhook ~= "" then
 			local payload = {
-				content = "MYTHICAL FAMILY ROLLED! @everyone",
+				content = "🌟 MYTHICAL FAMILY ROLLED! @everyone",
 				embeds = {{
-					title = "Family Roll Success",
+					title = "🎲 Family Roll Success",
 					color = 0xff0000,
 					fields = {
 						{
-							name = "Information",
+							name = "📋 Information",
 							value = "```\n" ..
 									"User: " .. lp.Name .. "\n" ..
-									"Family: " .. tostring(familyString) .. "\n" ..
-									"\n```",
+									"Family: " .. tostring(familyString) .. "\n```",
 							inline = true
 						}
 					},
@@ -1074,7 +1032,7 @@ local function roll(targets, rarities)
 		pcall(function()
 			Rayfield:Notify({
 				Title = "TITANIC HUB",
-				Content = "Target family rolled: " .. familyString,
+				Content = "✅ Target family rolled: " .. familyString,
 				Duration = 5,
 				Image = 4483362458,
 			})
@@ -1127,7 +1085,6 @@ local function handleWeaponReload()
 
 		local current = getBladeCount() or 0
 
-		-- 1. Refill Reserves (if empty)
 		if current == 0 and autoRefillEnabled then
 			local refillPart = workspace:FindFirstChild("Unclimbable")
 				and workspace.Unclimbable:FindFirstChild("Reloads")
@@ -1145,7 +1102,6 @@ local function handleWeaponReload()
 			end
 		end
 
-		-- 2. Equip Blade (if missing from hand and we have reserves)
 		if blade and blade.Transparency == 1 and current > 0 then
 			isReloading = true
 			lastReloadTime = os.clock()
@@ -1177,7 +1133,6 @@ local function handleWeaponReload()
 	end
 end
 
--- Unified high-frequency polling loop
 task.spawn(function()
 	while true do
 		pcall(handleWeaponReload)
@@ -1185,7 +1140,6 @@ task.spawn(function()
 	end
 end)
 
--- Auto Escape listener
 getgenv().AutoEscape = false
 postRemote.OnClientEvent:Connect(function(...)
 	local args = {...}
@@ -1196,16 +1150,16 @@ postRemote.OnClientEvent:Connect(function(...)
 end)
 
 -- ==========================================
--- RAYFIELD UI LIBRARY LOAD
+-- 🔥 RAYFIELD UI LIBRARY LOAD
 -- ==========================================
 
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-	Name = "TITANIC HUB",
-	Icon = 4483362458, -- Icon in AssetId form
+	Name = "⚔️ TITANIC HUB",
+	Icon = 4483362458,
 	LoadingTitle = "TITANIC HUB",
-	LoadingSubtitle = "by Titanic Hub Team",
+	LoadingSubtitle = "Attack on Titan: Revolution",
 	Theme = "Default",
 
 	DisableRayfieldPrompts = false,
@@ -1227,23 +1181,28 @@ local Window = Rayfield:CreateWindow({
 })
 
 -- ==========================================
--- TABS
+-- 📑 TABS (9 Total)
 -- ==========================================
 
-local MainTab = Window:CreateTab("Main", 4483362458) -- house icon
-local UpgradesTab = Window:CreateTab("Upgrades", 4483362458) -- trending-up icon
-local MiscTab = Window:CreateTab("Misc", 4483362458) -- boxes icon
-local SettingsTab = Window:CreateTab("Settings", 4483362458) -- settings icon
+local FarmTab = Window:CreateTab("🌾 Farm", 4483362458)
+local TSQuestTab = Window:CreateTab("📜 TS Quest", 4483362458)        -- [KHAALI - FUTURE]
+local AutoStartTab = Window:CreateTab("🚀 Auto Start", 4483362458)
+local UpgradesTab = Window:CreateTab("📈 Upgrades", 4483362458)
+local PrestigeSlotTab = Window:CreateTab("💎 Prestige & Slot", 4483362458)
+local FamilyRollTab = Window:CreateTab("🎲 Family Roll", 4483362458)
+local WebhookMiscTab = Window:CreateTab("🔧 Webhook & Misc", 4483362458)
+local DiscordTab = Window:CreateTab("💬 Discord", 4483362458)          -- Discord Info
+local SettingsTab = Window:CreateTab("⚙️ Settings", 4483362458)
 
 -- ==========================================
--- MAIN TAB : Farm Section
+-- 🌾 TAB 1: FARM
 -- ==========================================
 
-local FarmSection = MainTab:CreateSection("Farm")
+local FarmMainSection = FarmTab:CreateSection("Main Farming")
 
-getgenv().CurrentStatusLabel = MainTab:CreateLabel("Status: Idle", 4483362458, Color3.fromRGB(255, 255, 255), false)
+getgenv().CurrentStatusLabel = FarmTab:CreateLabel("🔹 Status: Idle", 4483362458, Color3.fromRGB(255, 255, 255), false)
 
-local AutoKillToggle = MainTab:CreateToggle({
+FarmTab:CreateToggle({
 	Name = "Auto Farm",
 	CurrentValue = false,
 	Flag = "AutoKillToggle",
@@ -1252,7 +1211,7 @@ local AutoKillToggle = MainTab:CreateToggle({
 	end,
 })
 
-local MasteryFarmToggle = MainTab:CreateToggle({
+FarmTab:CreateToggle({
 	Name = "Titan Mastery Farm",
 	CurrentValue = false,
 	Flag = "MasteryFarmToggle",
@@ -1268,7 +1227,7 @@ local MasteryFarmToggle = MainTab:CreateToggle({
 	end,
 })
 
-local MasteryModeDropdown = MainTab:CreateDropdown({
+FarmTab:CreateDropdown({
 	Name = "Mastery Mode",
 	Options = {"Punching", "Skill Usage", "Both"},
 	CurrentOption = {"Both"},
@@ -1279,7 +1238,9 @@ local MasteryModeDropdown = MainTab:CreateDropdown({
 	end,
 })
 
-local MovementModeDropdown = MainTab:CreateDropdown({
+local FarmMovementSection = FarmTab:CreateSection("Movement & Combat")
+
+FarmTab:CreateDropdown({
 	Name = "Movement Mode",
 	Options = {"Hover", "Teleport"},
 	CurrentOption = {"Hover"},
@@ -1290,7 +1251,33 @@ local MovementModeDropdown = MainTab:CreateDropdown({
 	end,
 })
 
-local FarmOptionsDropdown = MainTab:CreateDropdown({
+FarmTab:CreateSlider({
+	Name = "Hover Speed",
+	Range = {100, 500},
+	Increment = 1,
+	Suffix = " studs/s",
+	CurrentValue = 400,
+	Flag = "HoverSpeedSlider",
+	Callback = function(Value)
+		getgenv().AutoFarmConfig.MoveSpeed = Value
+	end,
+})
+
+FarmTab:CreateSlider({
+	Name = "Float Height",
+	Range = {100, 300},
+	Increment = 1,
+	Suffix = " studs",
+	CurrentValue = 250,
+	Flag = "FloatHeightSlider",
+	Callback = function(Value)
+		getgenv().AutoFarmConfig.HeightOffset = Value
+	end,
+})
+
+local FarmUtilitySection = FarmTab:CreateSection("Utility")
+
+FarmTab:CreateDropdown({
 	Name = "Farm Options",
 	Options = {"Auto Execute", "Failsafe", "Open Second Chest"},
 	CurrentOption = {},
@@ -1306,31 +1293,7 @@ local FarmOptionsDropdown = MainTab:CreateDropdown({
 	end,
 })
 
-local HoverSpeedSlider = MainTab:CreateSlider({
-	Name = "Hover Speed",
-	Range = {100, 500},
-	Increment = 1,
-	Suffix = "studs/s",
-	CurrentValue = 400,
-	Flag = "HoverSpeedSlider",
-	Callback = function(Value)
-		getgenv().AutoFarmConfig.MoveSpeed = Value
-	end,
-})
-
-local FloatHeightSlider = MainTab:CreateSlider({
-	Name = "Float Height",
-	Range = {100, 300},
-	Increment = 1,
-	Suffix = "studs",
-	CurrentValue = 250,
-	Flag = "FloatHeightSlider",
-	Callback = function(Value)
-		getgenv().AutoFarmConfig.HeightOffset = Value
-	end,
-})
-
-local AutoReloadToggle = MainTab:CreateToggle({
+FarmTab:CreateToggle({
 	Name = "Auto Reload/Refill",
 	CurrentValue = false,
 	Flag = "AutoReloadToggle",
@@ -1340,7 +1303,7 @@ local AutoReloadToggle = MainTab:CreateToggle({
 	end,
 })
 
-local AutoEscapeToggle = MainTab:CreateToggle({
+FarmTab:CreateToggle({
 	Name = "Auto Escape",
 	CurrentValue = false,
 	Flag = "AutoEscapeToggle",
@@ -1349,7 +1312,7 @@ local AutoEscapeToggle = MainTab:CreateToggle({
 	end,
 })
 
-local AutoSkipToggle = MainTab:CreateToggle({
+FarmTab:CreateToggle({
 	Name = "Auto Skip Cutscenes",
 	CurrentValue = false,
 	Flag = "AutoSkipToggle",
@@ -1359,7 +1322,7 @@ local AutoSkipToggle = MainTab:CreateToggle({
 	end,
 })
 
-local AutoRetryToggle = MainTab:CreateToggle({
+FarmTab:CreateToggle({
 	Name = "Auto Retry",
 	CurrentValue = false,
 	Flag = "AutoRetryToggle",
@@ -1369,7 +1332,7 @@ local AutoRetryToggle = MainTab:CreateToggle({
 	end,
 })
 
-local AutoChestToggle = MainTab:CreateToggle({
+FarmTab:CreateToggle({
 	Name = "Auto Open Chests",
 	CurrentValue = false,
 	Flag = "AutoChestToggle",
@@ -1379,19 +1342,7 @@ local AutoChestToggle = MainTab:CreateToggle({
 	end,
 })
 
-local DeleteMapToggle = MainTab:CreateToggle({
-	Name = "Delete Map (FPS Boost)",
-	CurrentValue = DropdownConfig.DeleteMap or false,
-	Flag = "DeleteMapToggle",
-	Callback = function(Value)
-		getgenv().DeleteMap = Value
-		DropdownConfig.DeleteMap = getgenv().DeleteMap
-		SaveConfig(DropdownConfig)
-		if getgenv().DeleteMap then DeleteMap() end
-	end,
-})
-
-local SoloOnlyToggle = MainTab:CreateToggle({
+FarmTab:CreateToggle({
 	Name = "Solo Only",
 	CurrentValue = false,
 	Flag = "SoloOnlyToggle",
@@ -1400,62 +1351,58 @@ local SoloOnlyToggle = MainTab:CreateToggle({
 	end,
 })
 
-local AutoReturnLobbyToggle = MainTab:CreateToggle({
+FarmTab:CreateToggle({
 	Name = "Auto Return to Lobby",
 	CurrentValue = false,
 	Flag = "AutoReturnLobbyToggle",
 	Callback = function(Value)
 		getgenv().AutoReturnLobby = Value
-		if not getgenv().AutoReturnLobby then
+		if not Value then
 			pcall(function() writefile(returnCounterPath, "0") end)
 		end
 	end,
 })
 
-MainTab:CreateLabel("Failsafe tps you back to lobby after a timeout.", 4483362458, Color3.fromRGB(255, 200, 200), false)
-
 -- ==========================================
--- MAIN TAB : Auto Start Section
+-- 📜 TAB 2: TS QUEST (KHAALI - FUTURE USE)
 -- ==========================================
 
-local AutoStartSection = MainTab:CreateSection("Auto Start")
+TSQuestTab:CreateSection("TS Quest Features")
+TSQuestTab:CreateLabel("🔜 Coming Soon...", 4483362458, Color3.fromRGB(255, 200, 100), false)
+TSQuestTab:CreateLabel("This tab will be used for TS Quest features in future updates.", 4483362458, Color3.fromRGB(200, 200, 200), false)
+TSQuestTab:CreateLabel("Stay tuned! 🚀", 4483362458, Color3.fromRGB(100, 255, 100), false)
 
-MainTab:CreateButton({
-	Name = "Return to Lobby",
+-- ==========================================
+-- 🚀 TAB 3: AUTO START
+-- ==========================================
+
+local AutoStartActions = AutoStartTab:CreateSection("Quick Actions")
+
+AutoStartTab:CreateButton({
+	Name = "🏠 Return to Lobby",
 	Callback = function()
 		getRemote:InvokeServer("Functions", "Teleport", "Lobby")
 		TeleportService:Teleport(14916516914, lp)
 	end,
 })
 
-MainTab:CreateButton({
-	Name = "Join Discord",
-	Callback = function()
-		setclipboard("https://discord.gg/N83Tn2SkJz")
-		Rayfield:Notify({
-			Title = "Discord",
-			Content = "Invite link copied to clipboard!",
-			Duration = 5,
-			Image = 4483362458,
-		})
-	end,
-})
+local AutoStartMain = AutoStartTab:CreateSection("Auto Start Configuration")
 
-local AutoStartToggle = MainTab:CreateToggle({
+AutoStartTab:CreateToggle({
 	Name = "Auto Start",
 	CurrentValue = false,
 	Flag = "AutoStartToggle",
 	Callback = function(Value)
 		getgenv().AutoStart = Value
 
-		if getgenv().AutoStart and game.PlaceId == 14916516914 then
+		if Value and game.PlaceId == 14916516914 then
 			task.spawn(function()
 				local MAX_RETRIES = 10
 				local retries = 0
 
 				local function getMyMission()
 					local start = os.clock()
-					while (os.clock() - start) < 2 do -- 2 second timeout for replication
+					while (os.clock() - start) < 2 do
 						for _, mission in next, ReplicatedStorage.Missions:GetChildren() do
 							if mission:FindFirstChild("Leader") and mission.Leader.Value == lp.Name then
 								return mission
@@ -1474,9 +1421,7 @@ local AutoStartToggle = MainTab:CreateToggle({
 					end
 
 					local missionType = Rayfield.Flags.StartTypeDropdown.CurrentOption[1]
-					local selectedDifficulty
-					local mapName
-					local objective
+					local selectedDifficulty, mapName, objective
 
 					if missionType == "Missions" then
 						selectedDifficulty = Rayfield.Flags.MissionDifficultyDropdown.CurrentOption[1]
@@ -1508,7 +1453,7 @@ local AutoStartToggle = MainTab:CreateToggle({
 							if getMyMission() then
 								Rayfield:Notify({
 									Title = "Auto Start",
-									Content = "Selected difficulty: " .. diff,
+									Content = "✅ Selected difficulty: " .. diff,
 									Duration = 3,
 									Image = 4483362458,
 								})
@@ -1536,7 +1481,7 @@ local AutoStartToggle = MainTab:CreateToggle({
 						if retries >= MAX_RETRIES then
 							Rayfield:Notify({
 								Title = "Auto Start",
-								Content = "Failed after " .. MAX_RETRIES .. " retries. Stopping.",
+								Content = "❌ Failed after " .. MAX_RETRIES .. " retries. Stopping.",
 								Duration = 10,
 								Image = 4483362458,
 							})
@@ -1547,7 +1492,7 @@ local AutoStartToggle = MainTab:CreateToggle({
 
 						Rayfield:Notify({
 							Title = "Auto Start",
-							Content = "Failed to create. Retry " .. retries .. "/" .. MAX_RETRIES .. " in " .. backoff .. "s",
+							Content = "⏳ Retry " .. retries .. "/" .. MAX_RETRIES .. " in " .. backoff .. "s",
 							Duration = backoff,
 							Image = 4483362458,
 						})
@@ -1572,7 +1517,6 @@ local AutoStartToggle = MainTab:CreateToggle({
 
 					task.wait(0.5)
 					getRemote:InvokeServer("S_Missions", "Start")
-
 					task.wait(5)
 				end
 			end)
@@ -1580,33 +1524,30 @@ local AutoStartToggle = MainTab:CreateToggle({
 	end,
 })
 
-local StartTypeDropdown = MainTab:CreateDropdown({
+AutoStartTab:CreateDropdown({
 	Name = "Type",
 	Options = {"Missions", "Raids"},
 	CurrentOption = {DropdownConfig._lastType or "Missions"},
 	MultipleOptions = false,
 	Flag = "StartTypeDropdown",
 	Callback = function(Option)
-		local Value = Option[1]
-		if not Value then return end
-		
-		DropdownConfig._lastType = Value
+		DropdownConfig._lastType = Option[1]
 		SaveConfig(DropdownConfig)
 	end,
 })
 
-local MissionMapDropdown = MainTab:CreateDropdown({
+local MissionSection = AutoStartTab:CreateSection("Mission Settings")
+
+AutoStartTab:CreateDropdown({
 	Name = "Mission Map",
 	Options = {"Shiganshina","Trost","Outskirts","Giant Forest","Utgard","Loading Docks","Stohess"},
 	CurrentOption = {DropdownConfig.Missions and DropdownConfig.Missions.map or "Shiganshina"},
 	MultipleOptions = false,
 	Flag = "MissionMapDropdown",
 	Callback = function(Option)
-		local Value = Option[1]
-		if not Value then return end
-		Rayfield.Flags.MissionObjectiveDropdown:Refresh(Missions[Value] or {})
+		Rayfield.Flags.MissionObjectiveDropdown:Refresh(Missions[Option[1]] or {})
 		DropdownConfig.Missions = DropdownConfig.Missions or {}
-		DropdownConfig.Missions.map = Value
+		DropdownConfig.Missions.map = Option[1]
 		SaveConfig(DropdownConfig)
 	end,
 })
@@ -1615,48 +1556,44 @@ local initMissionMap = DropdownConfig.Missions and DropdownConfig.Missions.map o
 local initMissionObjVals = Missions[initMissionMap] or {}
 local initMissionObjDef = DropdownConfig.Missions and DropdownConfig.Missions.objective or initMissionObjVals[1]
 
-local MissionObjectiveDropdown = MainTab:CreateDropdown({
+AutoStartTab:CreateDropdown({
 	Name = "Mission Objective",
 	Options = initMissionObjVals,
 	CurrentOption = {initMissionObjDef},
 	MultipleOptions = false,
 	Flag = "MissionObjectiveDropdown",
 	Callback = function(Option)
-		local Value = Option[1]
 		DropdownConfig.Missions = DropdownConfig.Missions or {}
-		DropdownConfig.Missions.objective = Value
+		DropdownConfig.Missions.objective = Option[1]
 		SaveConfig(DropdownConfig)
 	end,
 })
 
-local MissionDifficultyDropdown = MainTab:CreateDropdown({
+AutoStartTab:CreateDropdown({
 	Name = "Mission Difficulty",
 	Options = {"Easy","Normal","Hard","Severe","Aberrant","Hardest"},
 	CurrentOption = {DropdownConfig.Missions and DropdownConfig.Missions.difficulty or "Normal"},
 	MultipleOptions = false,
 	Flag = "MissionDifficultyDropdown",
 	Callback = function(Option)
-		local Value = Option[1]
 		DropdownConfig.Missions = DropdownConfig.Missions or {}
-		DropdownConfig.Missions.difficulty = Value
+		DropdownConfig.Missions.difficulty = Option[1]
 		SaveConfig(DropdownConfig)
 	end,
 })
 
-MainTab:CreateLabel("", 0, Color3.new(), false) -- spacer
+local RaidSection = AutoStartTab:CreateSection("Raid Settings")
 
-local RaidMapDropdown = MainTab:CreateDropdown({
+AutoStartTab:CreateDropdown({
 	Name = "Raid Map",
 	Options = {"Trost","Shiganshina","Stohess"},
 	CurrentOption = {DropdownConfig.Raids and DropdownConfig.Raids.map or "Trost"},
 	MultipleOptions = false,
 	Flag = "RaidMapDropdown",
 	Callback = function(Option)
-		local Value = Option[1]
-		if not Value then return end
-		Rayfield.Flags.RaidObjectiveDropdown:Refresh(Missions[Value] or {})
+		Rayfield.Flags.RaidObjectiveDropdown:Refresh(Missions[Option[1]] or {})
 		DropdownConfig.Raids = DropdownConfig.Raids or {}
-		DropdownConfig.Raids.map = Value
+		DropdownConfig.Raids.map = Option[1]
 		SaveConfig(DropdownConfig)
 	end,
 })
@@ -1665,37 +1602,35 @@ local initRaidMap = DropdownConfig.Raids and DropdownConfig.Raids.map or "Trost"
 local initRaidObjVals = Missions[initRaidMap] or {}
 local initRaidObjDef = DropdownConfig.Raids and DropdownConfig.Raids.objective or initRaidObjVals[1]
 
-local RaidObjectiveDropdown = MainTab:CreateDropdown({
+AutoStartTab:CreateDropdown({
 	Name = "Raid Objective",
 	Options = initRaidObjVals,
 	CurrentOption = {initRaidObjDef},
 	MultipleOptions = false,
 	Flag = "RaidObjectiveDropdown",
 	Callback = function(Option)
-		local Value = Option[1]
 		DropdownConfig.Raids = DropdownConfig.Raids or {}
-		DropdownConfig.Raids.objective = Value
+		DropdownConfig.Raids.objective = Option[1]
 		SaveConfig(DropdownConfig)
 	end,
 })
 
-local RaidDifficultyDropdown = MainTab:CreateDropdown({
+AutoStartTab:CreateDropdown({
 	Name = "Raid Difficulty",
 	Options = {"Hard","Severe","Aberrant","Hardest"},
 	CurrentOption = {DropdownConfig.Raids and DropdownConfig.Raids.difficulty or "Hard"},
 	MultipleOptions = false,
 	Flag = "RaidDifficultyDropdown",
 	Callback = function(Option)
-		local Value = Option[1]
 		DropdownConfig.Raids = DropdownConfig.Raids or {}
-		DropdownConfig.Raids.difficulty = Value
+		DropdownConfig.Raids.difficulty = Option[1]
 		SaveConfig(DropdownConfig)
 	end,
 })
 
-MainTab:CreateLabel("Trost: Attack Titan | Shiganshina: Armored Titan | Stohess: Female Titan", 4483362458, Color3.fromRGB(200, 200, 255), false)
+AutoStartTab:CreateLabel("📍 Trost: Attack Titan | Shiganshina: Armored Titan | Stohess: Female Titan", 4483362458, Color3.fromRGB(200, 200, 255), false)
 
-local ModifiersDropdown = MainTab:CreateDropdown({
+AutoStartTab:CreateDropdown({
 	Name = "Modifiers",
 	Options = {"No Perks","No Skills","No Talents","Nightmare","Oddball","Injury Prone","Chronic Injuries","Fog","Glass Cannon","Time Trial","Boring","Simple"},
 	CurrentOption = {},
@@ -1705,18 +1640,18 @@ local ModifiersDropdown = MainTab:CreateDropdown({
 })
 
 -- ==========================================
--- UPGRADES TAB : Upgrades Section
+-- 📈 TAB 4: UPGRADES
 -- ==========================================
 
-local UpgradesSection = UpgradesTab:CreateSection("Upgrades")
+local GearSection = UpgradesTab:CreateSection("Gear Upgrades")
 
-local AutoUpgradeToggle = UpgradesTab:CreateToggle({
+UpgradesTab:CreateToggle({
 	Name = "Upgrade Gear",
 	CurrentValue = false,
 	Flag = "AutoUpgradeToggle",
 	Callback = function(Value)
 		getgenv().AutoUpgrade = Value
-		if getgenv().AutoUpgrade then
+		if Value then
 			if game.PlaceId ~= 14916516914 then return end
 			task.spawn(function()
 				local plrData = GetPlayerData()
@@ -1731,7 +1666,7 @@ local AutoUpgradeToggle = UpgradesTab:CreateToggle({
 					for upg, lvl in next, upgrades do
 						if getRemote:InvokeServer("S_Equipment", "Upgrade", upg) then
 							Rayfield:Notify({
-								Title = "Upgraded " .. string.gsub(upg, "_", " "),
+								Title = "🔧 Upgraded " .. string.gsub(upg, "_", " "),
 								Content = "Level " .. tostring(lvl),
 								Duration = 1.5,
 								Image = 4483362458,
@@ -1739,7 +1674,6 @@ local AutoUpgradeToggle = UpgradesTab:CreateToggle({
 							task.wait(0.3)
 						end
 					end
-
 					task.wait(0.5)
 				end
 			end)
@@ -1747,13 +1681,15 @@ local AutoUpgradeToggle = UpgradesTab:CreateToggle({
 	end,
 })
 
-local AutoEnhanceToggle = UpgradesTab:CreateToggle({
+local PerkSection = UpgradesTab:CreateSection("Perk Enhancement")
+
+UpgradesTab:CreateToggle({
 	Name = "Enhance Perks",
 	CurrentValue = false,
 	Flag = "AutoEnhanceToggle",
 	Callback = function(Value)
 		getgenv().AutoPerk = Value
-		if getgenv().AutoPerk then
+		if Value then
 			if game.PlaceId ~= 14916516914 then return end
 			task.spawn(function()
 				local plrData = GetPlayerData()
@@ -1772,14 +1708,15 @@ local AutoEnhanceToggle = UpgradesTab:CreateToggle({
 				local perkSlot = Rayfield.Flags.PerkSlotDropdown.CurrentOption[1]
 				local equippedPerkId = slot.Perks.Equipped[perkSlot]
 				if not equippedPerkId then
-					Rayfield:Notify({ Title = "Auto Perk", Content = "No perk equipped in " .. tostring(perkSlot) .. " slot.", Duration = 3, Image = 4483362458 })
+					Rayfield:Notify({ Title = "Auto Perk", Content = "❌ No perk equipped in " .. tostring(perkSlot) .. " slot.", Duration = 3, Image = 4483362458 })
 					getgenv().AutoPerk = false
 					Rayfield.Flags.AutoEnhanceToggle:Set(false)
 					return
 				end
 
 				local perkData = storagePerks[equippedPerkId]
-				if not perkData then					Rayfield:Notify({ Title = "Auto Perk", Content = "Equipped perk data not found.", Duration = 3, Image = 4483362458 })
+				if not perkData then
+					Rayfield:Notify({ Title = "Auto Perk", Content = "❌ Equipped perk data not found.", Duration = 3, Image = 4483362458 })
 					getgenv().AutoPerk = false
 					Rayfield.Flags.AutoEnhanceToggle:Set(false)
 					return
@@ -1792,7 +1729,7 @@ local AutoEnhanceToggle = UpgradesTab:CreateToggle({
 
 				while getgenv().AutoPerk do
 					if currentLevel >= 10 then
-						Rayfield:Notify({ Title = "Auto Perk", Content = perkName .. " is already Level 10!", Duration = 3, Image = 4483362458 })
+						Rayfield:Notify({ Title = "Auto Perk", Content = "✅ " .. perkName .. " is already Level 10!", Duration = 3, Image = 4483362458 })
 						break
 					end
 
@@ -1815,13 +1752,12 @@ local AutoEnhanceToggle = UpgradesTab:CreateToggle({
 					end
 
 					if #validPerks == 0 then
-						Rayfield:Notify({ Title = "Auto Perk", Content = "No more food perks found.", Duration = 3, Image = 4483362458 })
+						Rayfield:Notify({ Title = "Auto Perk", Content = "❌ No more food perks found.", Duration = 3, Image = 4483362458 })
 						break
 					end
 
 					if getRemote:InvokeServer("S_Equipment", "Enhance", equippedPerkId, validPerks) then
 						for _, id in ipairs(validPerks) do storagePerks[id] = nil end
-
 						currentXP = currentXP + totalXPGain
 
 						while currentLevel < 10 do
@@ -1834,7 +1770,7 @@ local AutoEnhanceToggle = UpgradesTab:CreateToggle({
 						end
 
 						Rayfield:Notify({
-							Title = "Enhanced: " .. perkName,
+							Title = "✨ Enhanced: " .. perkName,
 							Content = "Level " .. tostring(currentLevel) .. " (+" .. totalXPGain .. " XP)",
 							Duration = 1,
 							Image = 4483362458,
@@ -1842,7 +1778,6 @@ local AutoEnhanceToggle = UpgradesTab:CreateToggle({
 					else
 						continue
 					end
-
 					task.wait(0.5)
 				end
 
@@ -1853,7 +1788,7 @@ local AutoEnhanceToggle = UpgradesTab:CreateToggle({
 	end,
 })
 
-local PerkSlotDropdown = UpgradesTab:CreateDropdown({
+UpgradesTab:CreateDropdown({
 	Name = "Perk Slot",
 	Options = {"Defense", "Support", "Family", "Extra", "Offense", "Body"},
 	CurrentOption = {"Body"},
@@ -1862,7 +1797,7 @@ local PerkSlotDropdown = UpgradesTab:CreateDropdown({
 	Callback = function() end,
 })
 
-local SelectPerksDropdown = UpgradesTab:CreateDropdown({
+UpgradesTab:CreateDropdown({
 	Name = "Perks to use (Food)",
 	Options = {"Common", "Rare", "Epic", "Legendary"},
 	CurrentOption = {},
@@ -1871,15 +1806,11 @@ local SelectPerksDropdown = UpgradesTab:CreateDropdown({
 	Callback = function() end,
 })
 
-UpgradesTab:CreateLabel("Default perk slot is Body", 4483362458, Color3.fromRGB(255, 255, 255), false)
-
--- ==========================================
--- UPGRADES TAB : Skill Tree Section
--- ==========================================
+UpgradesTab:CreateLabel("💡 Default perk slot is Body", 4483362458, Color3.fromRGB(255, 255, 100), false)
 
 local SkillTreeSection = UpgradesTab:CreateSection("Skill Tree")
 
-local AutoSkillTree = UpgradesTab:CreateToggle({
+UpgradesTab:CreateToggle({
 	Name = "Auto Skill Tree",
 	CurrentValue = false,
 	Flag = "AutoSkillTree",
@@ -1887,7 +1818,7 @@ local AutoSkillTree = UpgradesTab:CreateToggle({
 		getgenv().AutoSkillTree = Value
 		local plrData = GetPlayerData()
 
-		if getgenv().AutoSkillTree then
+		if Value then
 			if game.PlaceId ~= 14916516914 then return end
 			if not plrData or not plrData.Slots then return end
 			task.spawn(function()
@@ -1930,7 +1861,7 @@ local AutoSkillTree = UpgradesTab:CreateToggle({
 								local success = getRemote:InvokeServer("S_Equipment", "Unlock", {skillId})
 								if success then
 									Rayfield:Notify({
-										Title = "Unlocked Skill",
+										Title = "🔓 Unlocked Skill",
 										Content = "ID: " .. skillId,
 										Duration = 1,
 										Image = 4483362458,
@@ -1946,7 +1877,7 @@ local AutoSkillTree = UpgradesTab:CreateToggle({
 	end,
 })
 
-local MiddlePathDropdown = UpgradesTab:CreateDropdown({
+UpgradesTab:CreateDropdown({
 	Name = "Middle Path",
 	Options = {"Damage", "Critical"},
 	CurrentOption = {"Critical"},
@@ -1955,7 +1886,7 @@ local MiddlePathDropdown = UpgradesTab:CreateDropdown({
 	Callback = function() end,
 })
 
-local LeftPathDropdown = UpgradesTab:CreateDropdown({
+UpgradesTab:CreateDropdown({
 	Name = "Left Path",
 	Options = {"Regen", "Cooldown Reduction"},
 	CurrentOption = {"Cooldown Reduction"},
@@ -1964,7 +1895,7 @@ local LeftPathDropdown = UpgradesTab:CreateDropdown({
 	Callback = function() end,
 })
 
-local RightPathDropdown = UpgradesTab:CreateDropdown({
+UpgradesTab:CreateDropdown({
 	Name = "Right Path",
 	Options = {"Health", "Damage Reduction"},
 	CurrentOption = {"Damage Reduction"},
@@ -1973,7 +1904,7 @@ local RightPathDropdown = UpgradesTab:CreateDropdown({
 	Callback = function() end,
 })
 
-local Priority1Dropdown = UpgradesTab:CreateDropdown({
+UpgradesTab:CreateDropdown({
 	Name = "Priority 1",
 	Options = {"Left", "Middle", "Right", "None"},
 	CurrentOption = {"Middle"},
@@ -1982,7 +1913,7 @@ local Priority1Dropdown = UpgradesTab:CreateDropdown({
 	Callback = function() end,
 })
 
-local Priority2Dropdown = UpgradesTab:CreateDropdown({
+UpgradesTab:CreateDropdown({
 	Name = "Priority 2",
 	Options = {"Left", "Middle", "Right", "None"},
 	CurrentOption = {"Left"},
@@ -1991,7 +1922,7 @@ local Priority2Dropdown = UpgradesTab:CreateDropdown({
 	Callback = function() end,
 })
 
-local Priority3Dropdown = UpgradesTab:CreateDropdown({
+UpgradesTab:CreateDropdown({
 	Name = "Priority 3",
 	Options = {"Left", "Middle", "Right", "None"},
 	CurrentOption = {"None"},
@@ -2001,18 +1932,18 @@ local Priority3Dropdown = UpgradesTab:CreateDropdown({
 })
 
 -- ==========================================
--- MISC TAB : Slot Section
+-- 💎 TAB 5: PRESTIGE & SLOT
 -- ==========================================
 
-local SlotSection = MiscTab:CreateSection("Slot")
+local SlotSection = PrestigeSlotTab:CreateSection("Slot Management")
 
-local AutoSelectSlot = MiscTab:CreateToggle({
+PrestigeSlotTab:CreateToggle({
 	Name = "Auto Select Slot",
 	CurrentValue = false,
 	Flag = "AutoSelectSlot",
 	Callback = function(Value)
 		getgenv().AutoSlot = Value
-		if getgenv().AutoSlot and not lp:GetAttribute("Slot") then
+		if Value and not lp:GetAttribute("Slot") then
 			local selectedSlot = Rayfield.Flags.SelectSlotDropdown.CurrentOption[1]
 			local args = { "Functions", "Select", string.sub(selectedSlot, -1) }
 			task.spawn(function()
@@ -2027,7 +1958,7 @@ local AutoSelectSlot = MiscTab:CreateToggle({
 	end,
 })
 
-local SelectSlotDropdown = MiscTab:CreateDropdown({
+PrestigeSlotTab:CreateDropdown({
 	Name = "Select Slot",
 	Options = {"Slot A", "Slot B", "Slot C"},
 	CurrentOption = {"Slot A"},
@@ -2036,13 +1967,15 @@ local SelectSlotDropdown = MiscTab:CreateDropdown({
 	Callback = function() end,
 })
 
-local AutoPrestigeToggle = MiscTab:CreateToggle({
+local PrestigeSection = PrestigeSlotTab:CreateSection("Prestige Settings")
+
+PrestigeSlotTab:CreateToggle({
 	Name = "Auto Prestige",
 	CurrentValue = false,
 	Flag = "AutoPrestigeToggle",
 	Callback = function(Value)
 		getgenv().AutoPrestige = Value
-		if getgenv().AutoPrestige then
+		if Value then
 			if game.PlaceId ~= 14916516914 then return end
 			task.spawn(function()
 				local pData = GetPlayerData()
@@ -2060,7 +1993,7 @@ local AutoPrestigeToggle = MiscTab:CreateToggle({
 						local success = getRemote:InvokeServer("S_Equipment", "Prestige", {Boosts = Rayfield.Flags.SelectBoostDropdown.CurrentOption[1], Talents = Memory})
 						if success then
 							Rayfield:Notify({
-								Title = "Successfully Prestiged",
+								Title = "🌟 Successfully Prestiged",
 								Content = "Prestiged with " .. Rayfield.Flags.SelectBoostDropdown.CurrentOption[1] .. " and " .. Memory,
 								Duration = 5,
 								Image = 4483362458,
@@ -2076,7 +2009,7 @@ local AutoPrestigeToggle = MiscTab:CreateToggle({
 	end,
 })
 
-local SelectBoostDropdown = MiscTab:CreateDropdown({
+PrestigeSlotTab:CreateDropdown({
 	Name = "Select Boost",
 	Options = {"Luck Boost", "EXP Boost", "Gold Boost"},
 	CurrentOption = {"Luck Boost"},
@@ -2085,7 +2018,7 @@ local SelectBoostDropdown = MiscTab:CreateDropdown({
 	Callback = function() end,
 })
 
-local PrestigeGoldSlider = MiscTab:CreateSlider({
+PrestigeSlotTab:CreateSlider({
 	Name = "Prestige Gold (in millions)",
 	Range = {0, 100},
 	Increment = 1,
@@ -2096,22 +2029,22 @@ local PrestigeGoldSlider = MiscTab:CreateSlider({
 })
 
 -- ==========================================
--- MISC TAB : Family Roll Section
+-- 🎲 TAB 6: FAMILY ROLL
 -- ==========================================
 
-local FamilyRollSection = MiscTab:CreateSection("Family Roll")
+FamilyRollTab:CreateSection("Family Roll Settings")
 
-local AutoRollToggle = MiscTab:CreateToggle({
+FamilyRollTab:CreateToggle({
 	Name = "Auto Roll",
 	CurrentValue = false,
 	Flag = "AutoRollToggle",
 	Callback = function(Value)
 		getgenv().AutoRoll = Value
-		if getgenv().AutoRoll then
+		if Value then
 			if game.PlaceId ~= 13379208636 then
 				Rayfield:Notify({
 					Title = "TITANIC HUB",
-					Content = "You must be in the lobby to use family roll features.",
+					Content = "⚠️ You must be in the lobby to use family roll features.",
 					Duration = 3,
 					Image = 4483362458,
 				})
@@ -2143,17 +2076,17 @@ local AutoRollToggle = MiscTab:CreateToggle({
 	end,
 })
 
-local SelectFamilyInput = MiscTab:CreateInput({
+FamilyRollTab:CreateInput({
 	Name = "Select Families",
 	CurrentValue = "",
 	PlaceholderText = "Fritz,Yeager,etc.",
-	RemoveTextAfterFocusLost = false,
+	RemoveTextAfterFocus Lost = false,
 	Flag = "SelectFamilyInput",
 	Callback = function(Text)
 		if Text ~= "" then
 			Rayfield:Notify({
 				Title = "TITANIC HUB",
-				Content = "Families selected: " .. Text,
+				Content = "📝 Families selected: " .. Text,
 				Duration = 2,
 				Image = 4483362458,
 			})
@@ -2161,7 +2094,7 @@ local SelectFamilyInput = MiscTab:CreateInput({
 	end,
 })
 
-local SelectFamilyRarity = MiscTab:CreateDropdown({
+FamilyRollTab:CreateDropdown({
 	Name = "Stop At",
 	Options = familyRaritiesOptions,
 	CurrentOption = {},
@@ -2170,15 +2103,16 @@ local SelectFamilyRarity = MiscTab:CreateDropdown({
 	Callback = function() end,
 })
 
-MiscTab:CreateLabel("Mythical families won't be rolled. Separate families with commas & no spaces (Fritz,Yeager)", 4483362458, Color3.fromRGB(255, 255, 200), false)
+FamilyRollTab:CreateLabel("⚠️ Mythical families won't be rolled", 4483362458, Color3.fromRGB(255, 150, 150), false)
+FamilyRollTab:CreateLabel("💡 Separate families with commas & no spaces (Fritz,Yeager)", 4483362458, Color3.fromRGB(255, 255, 200), false)
 
 -- ==========================================
--- MISC TAB : Settings Section
+-- 🔧 TAB 7: WEBHOOK & MISC
 -- ==========================================
 
-local SettingsSection = MiscTab:CreateSection("Settings")
+local WebhookSection = WebhookMiscTab:CreateSection("Discord Webhooks")
 
-local ToggleRewardWebhook = MiscTab:CreateToggle({
+WebhookMiscTab:CreateToggle({
 	Name = "Reward Webhook",
 	CurrentValue = false,
 	Flag = "ToggleRewardWebhook",
@@ -2187,7 +2121,7 @@ local ToggleRewardWebhook = MiscTab:CreateToggle({
 	end,
 })
 
-local ToggleMythicalFamilyWebhook = MiscTab:CreateToggle({
+WebhookMiscTab:CreateToggle({
 	Name = "Mythical Family Webhook",
 	CurrentValue = false,
 	Flag = "ToggleMythicalFamilyWebhook",
@@ -2196,25 +2130,32 @@ local ToggleMythicalFamilyWebhook = MiscTab:CreateToggle({
 	end,
 })
 
-local WebhookUrlInput = MiscTab:CreateInput({
+WebhookMiscTab:CreateInput({
 	Name = "Webhook URL",
 	CurrentValue = "",
 	PlaceholderText = "https://discord.com/api/webhooks/...",
-	RemoveTextAfterFocusLost = false,
+	RemoveTextAfterFocus Lost = false,
 	Flag = "WebhookUrl",
 	Callback = function(Text)
 		webhook = Text
 	end,
 })
 
-local AutoHideToggle = MiscTab:CreateToggle({
-	Name = "Auto Hide GUI",
-	CurrentValue = false,
-	Flag = "AutoHideToggle",
-	Callback = function() end,
+local MiscSection = WebhookMiscTab:CreateSection("Miscellaneous")
+
+WebhookMiscTab:CreateToggle({
+	Name = "Delete Map (FPS Boost)",
+	CurrentValue = DropdownConfig.DeleteMap or false,
+	Flag = "DeleteMapToggle",
+	Callback = function(Value)
+		getgenv().DeleteMap = Value
+		DropdownConfig.DeleteMap = getgenv().DeleteMap
+		SaveConfig(DropdownConfig)
+		if getgenv().DeleteMap then DeleteMap() end
+	end,
 })
 
-local Disable3DRendering = MiscTab:CreateToggle({
+WebhookMiscTab:CreateToggle({
 	Name = "Disable 3D Rendering (FPS Boost)",
 	CurrentValue = false,
 	Flag = "Disable3DRendering",
@@ -2223,11 +2164,58 @@ local Disable3DRendering = MiscTab:CreateToggle({
 	end,
 })
 
+WebhookMiscTab:CreateToggle({
+	Name = "Auto Hide GUI",
+	CurrentValue = false,
+	Flag = "AutoHideToggle",
+	Callback = function() end,
+})
+
 -- ==========================================
--- SETTINGS TAB
+-- 💬 TAB 8: DISCORD
 -- ==========================================
 
-local SettingsSectionTab = SettingsTab:CreateSection("Keybinds & Config")
+local DiscordInfoSection = DiscordTab:CreateSection("Discord Information")
+
+DiscordTab:CreateLabel("🔗 Join Our Discord Server!", 4483362458, Color3.fromRGB(88, 101, 242), false)
+DiscordTab:CreateLabel("", 4483362458, Color3.fromRGB(255, 255, 255), false)
+DiscordTab:CreateLabel("https://discord.gg/N83Tn2SkJz", 4483362458, Color3.fromRGB(150, 200, 255), false)
+DiscordTab:CreateLabel("", 4483362458, Color3.fromRGB(255, 255, 255), false)
+
+DiscordTab:CreateButton({
+	Name = "📋 Copy Discord Invite",
+	Callback = function()
+		setclipboard("https://discord.gg/N83Tn2SkJz")
+		Rayfield:Notify({
+			Title = "Discord",
+			Content = "✅ Invite link copied to clipboard!",
+			Duration = 5,
+			Image = 4483362458,
+		})
+	end,
+})
+
+DiscordTab:CreateLabel("", 4483362458, Color3.fromRGB(255, 255, 255), false)
+
+local DiscordFeaturesSection = DiscordTab:CreateSection("Discord Benefits")
+
+DiscordTab:CreateLabel("✨ Get updates on new features", 4483362458, Color3.fromRGB(100, 255, 100), false)
+DiscordTab:CreateLabel("🐛 Report bugs and get support", 4483362458, Color3.fromRGB(255, 200, 100), false)
+DiscordTab:CreateLabel("💡 Suggest new features", 4483362458, Color3.fromRGB(200, 150, 255), false)
+DiscordTab:CreateLabel("👥 Connect with other players", 4483362458, Color3.fromRGB(100, 200, 255), false)
+DiscordTab:CreateLabel("🎉 Participate in giveaways", 4483362458, Color3.fromRGB(255, 255, 100), false)
+
+local DiscordCreditsSection = DiscordTab:CreateSection("Credits")
+
+DiscordTab:CreateLabel("👨‍💻 Developed by: Titanic Hub Team", 4483362458, Color3.fromRGB(255, 255, 255), false)
+DiscordTab:CreateLabel("🎮 Game: Attack on Titan: Revolution", 4483362458, Color3.fromRGB(200, 200, 200), false)
+DiscordTab:CreateLabel("🛠️ UI Library: Rayfield", 4483362458, Color3.fromRGB(150, 150, 255), false)
+
+-- ==========================================
+-- ⚙️ TAB 9: SETTINGS
+-- ==========================================
+
+local KeybindSection = SettingsTab:CreateSection("Keybinds")
 
 SettingsTab:CreateKeybind({
 	Name = "Menu Toggle Keybind",
@@ -2239,32 +2227,47 @@ SettingsTab:CreateKeybind({
 	end,
 })
 
-SettingsTab:CreateButton({
-	Name = "Load Config",
-	Callback = function()
-		Rayfield:LoadConfiguration()
-	end,
-})
+local ConfigSection = SettingsTab:CreateSection("Configuration")
 
 SettingsTab:CreateButton({
-	Name = "Save Config",
+	Name = "💾 Save Config",
 	Callback = function()
 		Rayfield:SaveConfiguration()
+		Rayfield:Notify({
+			Title = "Settings",
+			Content = "✅ Configuration saved!",
+			Duration = 3,
+			Image = 4483362458,
+		})
 	end,
 })
 
+SettingsTab:CreateButton({
+	Name = "📂 Load Config",
+	Callback = function()
+		Rayfield:LoadConfiguration()
+		Rayfield:Notify({
+			Title = "Settings",
+			Content = "✅ Configuration loaded!",
+			Duration = 3,
+			Image = 4483362458,
+		})
+	end,
+})
+
+local ThemeSection = SettingsTab:CreateSection("UI Settings")
+
+SettingsTab:CreateLabel("Press " .. "RightControl" .. " to toggle the menu", 4483362458, Color3.fromRGB(200, 200, 200), false)
+SettingsTab:CreateLabel("Configuration auto-saves on change", 4483362458, Color3.fromRGB(150, 255, 150), false)
+
 -- ==========================================
--- CONFIGURATION LOADING
+-- 🔄 INITIALIZATION
 -- ==========================================
 
 task.spawn(function()
 	while not Rayfield.Loaded do task.wait() end
 	Rayfield:LoadConfiguration()
 end)
-
--- ==========================================
--- AUTOMATION LOOPS
--- ==========================================
 
 task.spawn(function()
 	while not Rayfield.Loaded do task.wait() end
@@ -2280,16 +2283,16 @@ lp.Idled:Connect(function()
 	virtualUser:ClickButton2(Vector2.new())
 end)
 
--- Auto Hide Logic
+-- Auto Hide & Init
 task.spawn(function()
 	while not Rayfield.Loaded do task.wait() end
-	task.wait(0.5) -- Wait for config load
+	task.wait(0.5)
 	if getgenv().DeleteMap then DeleteMap() end
 	if Rayfield.Flags.AutoHideToggle.CurrentValue then
 		Rayfield:Toggle()
 		Rayfield:Notify({
 			Title = "TITANIC HUB",
-			Content = "Auto Hid GUI",
+			Content = "👻 Auto Hid GUI",
 			Duration = 2,
 			Image = 4483362458,
 		})
