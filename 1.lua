@@ -2176,38 +2176,7 @@ ThemeManager:ApplyToTab(Tabs.Settings)
 
 ThemeManager:ApplyTheme("Jester")
 SaveManager:LoadAutoloadConfig()
--- MANUAL CRATE COLLECTION - Run this in console when near a crate
-local function ManualCollect()
-    local root = lp.Character and lp.Character:FindFirstChild("HumanoidRootPart")
-    if not root then return end
-    
-    -- Find nearest crate
-    local nearest = nil
-    local nearestDist = math.huge
-    
-    for _, obj in ipairs(workspace:GetDescendants()) do
-        if obj.Name == "Interact" then
-            local dist = (root.Position - obj.Position).Magnitude
-            if dist < nearestDist and dist < 20 then
-                nearest = obj
-                nearestDist = dist
-            end
-        end
-    end
-    
-    if nearest then
-        print("Found crate at", nearest.Position)
-        -- Try to collect
-        postRemote:FireServer("Interact", "Collect", nearest.Parent)
-        wait(1)
-        getRemote:InvokeServer("Interact", "Collect", nearest.Parent)
-    else
-        print("No crate nearby")
-    end
-end
 
--- Run this when you're standing next to a crate
-ManualCollect()
 Library:OnUnload(function()
 	Library.Unloaded = true
 end)
