@@ -192,7 +192,7 @@ function AutoFarm:Start()
 		while self._running and not checkReady() do
 			if os.clock() - startTime > 10 then -- Notify every 10s if still waiting
 				Library:Notify({
-					Title = "Tekkit Hub",
+					Title = "Us Suite",
 					Description = "Still waiting for mission assets to load...",
 					Time = 5
 				})
@@ -1072,7 +1072,7 @@ local function roll(targets, rarities)
 
 		pcall(function()
 			Library:Notify({
-				Title = "Tekkit Hub",
+				Title = "Us Suite",
 				Description = "Target family rolled: " .. familyString,
 				Time = 5,
 			})
@@ -1193,1080 +1193,789 @@ postRemote.OnClientEvent:Connect(function(...)
 	end
 end)
 
--- ==========================================
--- OBSIDIAN UI LIBRARY LOAD
--- ==========================================
 
-local repo = "https://raw.githubusercontent.com/deividcomsono/Obsidian/main/"
-local Library = loadstring(game:HttpGet(repo .. "Library.lua"))()
-local ThemeManager = loadstring(game:HttpGet(repo .. "addons/ThemeManager.lua"))()
-local SaveManager = loadstring(game:HttpGet(repo .. "addons/SaveManager.lua"))()
+-- ============================================================
+--   TITANIC HUB  |  by ZEKE
+--   Custom ScreenGui  —  replaces Obsidian UI Library
+-- ============================================================
 
-local Options = Library.Options
-local Toggles = Library.Toggles
+local TweenService      = game:GetService("TweenService")
+local UserInputService  = game:GetService("UserInputService")
 
--- ==========================================
--- TEKKIT HUB STYLE WINDOW
--- ==========================================
-
-local Window = Library:CreateWindow({
-	Title = "Tekkit Hub",
-	Footer = "AOT:R  •  v2.0",
-	Center = true,
-	AutoShow = true,
-	Resizable = true,
-	ShowCustomCursor = true,
-})
-
--- Sidebar sections mirroring Tekkit Hub layout:
---   In-Game  → Farming | Settings
---   Lobby    → Automation | Settings
---   Main Menu → Automation | Settings
-
-local Tabs = {
-	-- In-Game section
-	InGame_Farming  = Window:AddTab("Farming",    "sword"),
-	InGame_Settings = Window:AddTab("In-Game Settings", "settings"),
-
-	-- Lobby section
-	Lobby_Auto      = Window:AddTab("Automation", "zap"),
-	Lobby_Settings  = Window:AddTab("Lobby Settings", "sliders"),
-
-	-- Main Menu section
-	Menu_Auto       = Window:AddTab("Main Menu Automation", "play"),
-	Menu_Settings   = Window:AddTab("Main Menu Settings", "wrench"),
+-- ── Colour palette ──────────────────────────────────────────
+local C = {
+    BG0    = Color3.fromRGB(10,  11,  18),
+    BG1    = Color3.fromRGB(15,  17,  28),
+    BG2    = Color3.fromRGB(20,  23,  38),
+    BG3    = Color3.fromRGB(26,  30,  50),
+    BG4    = Color3.fromRGB(32,  37,  62),
+    ACC    = Color3.fromRGB(108, 60,  255),
+    ACC2   = Color3.fromRGB(139, 92,  246),
+    ACC3   = Color3.fromRGB(167,139,  250),
+    GREEN  = Color3.fromRGB(0,  200, 150),
+    GOLD   = Color3.fromRGB(245,158,  11),
+    CYAN   = Color3.fromRGB(34, 211, 238),
+    RED    = Color3.fromRGB(239, 68,  68),
+    WHITE  = Color3.fromRGB(226,232, 240),
+    MUTED  = Color3.fromRGB(148,163, 184),
+    DIM    = Color3.fromRGB(100,116, 139),
+    BOR    = Color3.fromRGB(42,  47,  70),
+    BOR2   = Color3.fromRGB(58,  63,  92),
 }
 
--- ── In-Game › Farming ──────────────────────────────────────
-local MainGroup     = Tabs.InGame_Farming:AddLeftGroupbox("Farm")
-local AutoStartGroup = Tabs.InGame_Farming:AddRightGroupbox("Auto Start")
+-- ── Helpers ─────────────────────────────────────────────────
+local function New(cls, p)
+    local o = Instance.new(cls)
+    for k,v in pairs(p) do
+        if k ~= "Parent" then o[k]=v end
+    end
+    if p.Parent then o.Parent = p.Parent end
+    return o
+end
+local function Corner(r,par)  New("UICorner",{CornerRadius=UDim.new(0,r),Parent=par}) end
+local function Stroke(c,t,par) New("UIStroke",{Color=c,Thickness=t,Parent=par}) end
+local function Pad(t,r,b,l,par)
+    New("UIPadding",{PaddingTop=UDim.new(0,t),PaddingRight=UDim.new(0,r),
+        PaddingBottom=UDim.new(0,b),PaddingLeft=UDim.new(0,l),Parent=par})
+end
+local function List(dir,gap,par)
+    New("UIListLayout",{FillDirection=dir,SortOrder=Enum.SortOrder.LayoutOrder,
+        Padding=UDim.new(0,gap),Parent=par})
+end
+local TI = TweenInfo.new(0.18,Enum.EasingStyle.Quad,Enum.EasingDirection.Out)
+local function Tw(o,props) TweenService:Create(o,TI,props):Play() end
 
--- ── In-Game › Settings ─────────────────────────────────────
-local SettingsGroup = Tabs.InGame_Settings:AddLeftGroupbox("Settings")
-local WebhookGroup  = Tabs.InGame_Settings:AddRightGroupbox("Webhook")
-
--- ── Lobby › Automation ─────────────────────────────────────
-local UpgradesGroup   = Tabs.Lobby_Auto:AddLeftGroupbox("Upgrades")
-local SkillTreeGroup  = Tabs.Lobby_Auto:AddRightGroupbox("Skill Tree")
-
--- ── Lobby › Settings ───────────────────────────────────────
-local SlotGroup       = Tabs.Lobby_Settings:AddLeftGroupbox("Slot")
-local FamilyRollGroup = Tabs.Lobby_Settings:AddRightGroupbox("Family Roll")
-
--- ==========================================
--- IN-GAME › FARMING TAB : Farm Groupbox
--- (Tekkit Hub style — subtitle labels under each item)
--- ==========================================
-getgenv().CurrentStatusLabel = MainGroup:AddLabel("Status: Idle")
-
-MainGroup:AddToggle("AutoKillToggle", {
-	Text = "Auto Farm",
-	Default = false,
-})
-MainGroup:AddLabel("Automatically kills titans and collects rewards.", true)
-Toggles.AutoKillToggle:OnChanged(function()
-	if Toggles.AutoKillToggle.Value then AutoFarm:Start() else AutoFarm:Stop() end
-end)
-
-MainGroup:AddToggle("MasteryFarmToggle", {
-	Text = "Titan Mastery Farm",
-	Default = false,
-})
-MainGroup:AddLabel("Farms titan mastery XP via punching or skills.", true)
-Toggles.MasteryFarmToggle:OnChanged(function()
-	getgenv().MasteryFarmConfig.Enabled = Toggles.MasteryFarmToggle.Value
-	if Toggles.MasteryFarmToggle.Value then
-		if not Toggles.AutoKillToggle.Value then
-			Toggles.AutoKillToggle:SetValue(true)
-		elseif not AutoFarm._running then
-			AutoFarm:Start()
-		end
-	end
-end)
-
-MainGroup:AddDropdown("MasteryModeDropdown", {
-	Values = {"Punching", "Skill Usage", "Both"},
-	Default = 3,
-	Multi = false,
-	Text = "Mastery Mode",
-})
-MainGroup:AddLabel("Choose how mastery XP is farmed.", true)
-Options.MasteryModeDropdown:OnChanged(function()
-	getgenv().MasteryFarmConfig.Mode = Options.MasteryModeDropdown.Value
-end)
-
-MainGroup:AddDropdown("MovementModeDropdown", {
-	Values = {"Hover", "Teleport"},
-	Default = 1,
-	Multi = false,
-	Text = "Movement Mode",
-})
-MainGroup:AddLabel("How the bot moves toward titans.", true)
-Options.MovementModeDropdown:OnChanged(function()
-	getgenv().AutoFarmConfig.MovementMode = Options.MovementModeDropdown.Value
-end)
-
-MainGroup:AddDropdown("FarmOptionsDropdown", {
-	Values = {"Auto Execute", "Failsafe", "Open Second Chest"},
-	Default = {},
-	Multi = true,
-	Text = "Farm Options",
-})
-MainGroup:AddLabel("Extra options applied during farming.", true)
-Options.FarmOptionsDropdown:OnChanged(function()
-	local vals = Options.FarmOptionsDropdown.Value
-	getgenv().AutoFailsafe = vals["Failsafe"] or false
-	getgenv().AutoExecute = vals["Auto Execute"] or false
-	getgenv().OpenSecondChest = vals["Open Second Chest"] or false
-	if getgenv().AutoExecute then setupAutoExecute() end
-end)
-
-MainGroup:AddSlider("HoverSpeedSlider", {
-	Text = "Hover Speed",
-	Default = 400,
-	Min = 100,
-	Max = 500,
-	Rounding = 0,
-})
-MainGroup:AddLabel("Speed at which the bot hovers to titans.", true)
-Options.HoverSpeedSlider:OnChanged(function()
-	getgenv().AutoFarmConfig.MoveSpeed = Options.HoverSpeedSlider.Value
-end)
-
-MainGroup:AddSlider("FloatHeightSlider", {
-	Text = "Float Height",
-	Default = 250,
-	Min = 100,
-	Max = 300,
-	Rounding = 0,
-})
-MainGroup:AddLabel("Height above ground while hovering.", true)
-Options.FloatHeightSlider:OnChanged(function()
-	getgenv().AutoFarmConfig.HeightOffset = Options.FloatHeightSlider.Value
-end)
-
-MainGroup:AddToggle("AutoReloadToggle", {
-	Text = "Auto Reload / Refill",
-	Default = false,
-})
-MainGroup:AddLabel("Automatically reloads blades and refills gas.", true)
-Toggles.AutoReloadToggle:OnChanged(function()
-	autoReloadEnabled = Toggles.AutoReloadToggle.Value
-	autoRefillEnabled = Toggles.AutoReloadToggle.Value
-end)
-
-MainGroup:AddToggle("AutoEscapeToggle", {
-	Text = "Auto Escape",
-	Default = false,
-})
-MainGroup:AddLabel("Escapes titan grabs automatically.", true)
-Toggles.AutoEscapeToggle:OnChanged(function()
-	getgenv().AutoEscape = Toggles.AutoEscapeToggle.Value
-end)
-
-MainGroup:AddToggle("AutoSkipToggle", {
-	Text = "Auto Skip Cutscenes",
-	Default = false,
-})
-MainGroup:AddLabel("Skips mission cutscenes to save time.", true)
-Toggles.AutoSkipToggle:OnChanged(function()
-	getgenv().AutoSkip = Toggles.AutoSkipToggle.Value
-	if getgenv().AutoSkip then ExecuteImmediateAutomation() end
-end)
-
-MainGroup:AddToggle("AutoRetryToggle", {
-	Text = "Auto Retry",
-	Default = false,
-})
-MainGroup:AddLabel("Retries the mission after completion or failure.", true)
-Toggles.AutoRetryToggle:OnChanged(function()
-	getgenv().AutoRetry = Toggles.AutoRetryToggle.Value
-	if getgenv().AutoRetry then ExecuteImmediateAutomation() end
-end)
-
-MainGroup:AddToggle("AutoChestToggle", {
-	Text = "Auto Open Chests",
-	Default = false,
-})
-MainGroup:AddLabel("Automatically opens chests at end of mission.", true)
-Toggles.AutoChestToggle:OnChanged(function()
-	getgenv().AutoChest = Toggles.AutoChestToggle.Value
-	if getgenv().AutoChest then ExecuteImmediateAutomation() end
-end)
-
-MainGroup:AddToggle("DeleteMapToggle", {
-	Text = "Delete Map (FPS Boost)",
-	Default = DropdownConfig.DeleteMap or false,
-})
-MainGroup:AddLabel("Removes map geometry for better performance.", true)
-Toggles.DeleteMapToggle:OnChanged(function()
-	getgenv().DeleteMap = Toggles.DeleteMapToggle.Value
-	DropdownConfig.DeleteMap = getgenv().DeleteMap
-	SaveConfig(DropdownConfig)
-	if getgenv().DeleteMap then DeleteMap() end
-end)
-
-MainGroup:AddToggle("SoloOnlyToggle", {
-	Text = "Solo Only",
-	Default = false,
-})
-Toggles.SoloOnlyToggle:OnChanged(function()
-	getgenv().SoloOnly = Toggles.SoloOnlyToggle.Value
-end)
-MainGroup:AddLabel("Only farms when no other players are present.", true)
-
-MainGroup:AddToggle("AutoReturnLobbyToggle", {
-	Text = "Auto Return to Lobby",
-	Default = false,
-})
-MainGroup:AddLabel("Returns to lobby after timeout or mission end.", true)
-Toggles.AutoReturnLobbyToggle:OnChanged(function()
-	getgenv().AutoReturnLobby = Toggles.AutoReturnLobbyToggle.Value
-	if not getgenv().AutoReturnLobby then
-		pcall(function() writefile(returnCounterPath, "0") end)
-	end
-end)
-
--- ==========================================
--- IN-GAME › FARMING TAB : Auto Start Groupbox
--- ==========================================
-
-AutoStartGroup:AddButton({
-	Text = "Return to Lobby",
-	Func = function()
-		getRemote:InvokeServer("Functions", "Teleport", "Lobby")
-		TeleportService:Teleport(14916516914, lp)
-	end,
-})
-AutoStartGroup:AddLabel("Teleports you back to the main lobby.", true)
-
-AutoStartGroup:AddButton({
-	Text = "Join Discord",
-	Func = function()
-		setclipboard("https://discord.gg/N83Tn2SkJz")
-		Library:Notify({
-			Title = "Discord",
-			Description = "Invite link copied to clipboard!",
-			Time = 5
-		})
-	end,
-})
-AutoStartGroup:AddLabel("Copies the community Discord invite link.", true)
-
-AutoStartGroup:AddToggle("AutoStartToggle", {
-	Text = "Auto Start",
-	Default = false,
-})
-AutoStartGroup:AddLabel("Automatically creates and starts missions.", true)
-Toggles.AutoStartToggle:OnChanged(function()
-	getgenv().AutoStart = Toggles.AutoStartToggle.Value
-
-	if getgenv().AutoStart and game.PlaceId == 14916516914 then
-		task.spawn(function()
-			local MAX_RETRIES = 10
-			local retries = 0
-
-			local function getMyMission()
-				local start = os.clock()
-				while (os.clock() - start) < 2 do -- 2 second timeout for replication
-					for _, mission in next, ReplicatedStorage.Missions:GetChildren() do
-						if mission:FindFirstChild("Leader") and mission.Leader.Value == lp.Name then
-							return mission
-						end
-					end
-					task.wait(0.1)
-				end
-				return nil
-			end
-
-			while getgenv().AutoStart do
-				for _, mission in next, ReplicatedStorage.Missions:GetChildren() do
-					if mission:FindFirstChild("Leader") and mission.Leader.Value == lp.Name then
-						getRemote:InvokeServer("S_Missions", "Leave")
-					end
-				end
-
-				local missionType = Options.StartTypeDropdown.Value
-				local selectedDifficulty
-				local mapName
-				local objective
-
-				if missionType == "Missions" then
-					selectedDifficulty = Options.MissionDifficultyDropdown.Value
-					mapName = Options.MissionMapDropdown.Value
-					objective = Options.MissionObjectiveDropdown.Value
-				else
-					selectedDifficulty = Options.RaidDifficultyDropdown.Value
-					mapName = Options.RaidMapDropdown.Value
-					objective = Options.RaidObjectiveDropdown.Value
-				end
-
-				local created = false
-
-				if selectedDifficulty == "Hardest" then
-					local diffOrder = missionType == "Raids"
-						and {"Aberrant", "Severe", "Hard"}
-						or {"Aberrant", "Severe", "Hard", "Normal", "Easy"}
-
-					for _, diff in ipairs(diffOrder) do
-						if not getgenv().AutoStart then break end
-
-						getRemote:InvokeServer("S_Missions", "Create", {
-							Difficulty = diff,
-							Type = missionType,
-							Name = mapName,
-							Objective = objective
-						})
-
-						if getMyMission() then
-							Library:Notify({
-								Title = "Auto Start",
-								Description = "Selected difficulty: " .. diff,
-								Time = 3
-							})
-							created = true
-							break
-						end
-					end
-				else
-					getRemote:InvokeServer("S_Missions", "Create", {
-						Difficulty = selectedDifficulty,
-						Type = missionType,
-						Name = mapName,
-						Objective = objective
-					})
-
-					if getMyMission() then created = true end
-				end
-
-				if not getgenv().AutoStart then break end
-
-				if not created then
-					retries = retries + 1
-					local backoff = math.min(retries * 2, 20)
-
-					if retries >= MAX_RETRIES then
-						Library:Notify({
-							Title = "Auto Start",
-							Description = "Failed after " .. MAX_RETRIES .. " retries. Stopping.",
-							Time = 10
-						})
-						getgenv().AutoStart = false
-						Toggles.AutoStartToggle:SetValue(false)
-						break
-					end
-
-					Library:Notify({
-						Title = "Auto Start",
-						Description = "Failed to create. Retry " .. retries .. "/" .. MAX_RETRIES .. " in " .. backoff .. "s",
-						Time = backoff
-					})
-					task.wait(backoff)
-					continue
-				end
-
-				retries = 0
-
-				local activeMods = {}
-				if Options.ModifiersDropdown.Value then
-					for modName, isActive in pairs(Options.ModifiersDropdown.Value) do
-						if isActive then table.insert(activeMods, modName) end
-					end
-				end
-
-				if #activeMods > 0 then
-					for _, modifier in ipairs(activeMods) do
-						getRemote:InvokeServer("S_Missions", "Modify", modifier)
-					end
-				end
-
-				task.wait(0.5)
-				getRemote:InvokeServer("S_Missions", "Start")
-
-				task.wait(5)
-			end
-		end)
-	end
-end)
-
-AutoStartGroup:AddDropdown("StartTypeDropdown", {
-	Values = {"Missions", "Raids"},
-	Default = DropdownConfig._lastType and table.find({"Missions", "Raids"}, DropdownConfig._lastType) or 1,
-	Multi = false,
-	Text = "Type",
-})
-AutoStartGroup:AddLabel("Choose between Missions or Raids.", true)
-Options.StartTypeDropdown:OnChanged(function()
-	local Value = Options.StartTypeDropdown.Value
-	if not Value then return end
-	
-	DropdownConfig._lastType = Value
-	SaveConfig(DropdownConfig)
-
-	local isMission = Value == "Missions"
-	Options.MissionMapDropdown:SetVisible(isMission)
-	Options.MissionObjectiveDropdown:SetVisible(isMission)
-	Options.MissionDifficultyDropdown:SetVisible(isMission)
-
-	Options.RaidMapDropdown:SetVisible(not isMission)
-	Options.RaidObjectiveDropdown:SetVisible(not isMission)
-	Options.RaidDifficultyDropdown:SetVisible(not isMission)
-end)
-
-AutoStartGroup:AddDropdown("MissionMapDropdown", {
-	Values = {"Shiganshina","Trost","Outskirts","Giant Forest","Utgard","Loading Docks","Stohess"},
-	Default = DropdownConfig.Missions and table.find({"Shiganshina","Trost","Outskirts","Giant Forest","Utgard","Loading Docks","Stohess"}, DropdownConfig.Missions.map) or 1,
-	Multi = false,
-	Text = "Mission Map",
-})
-AutoStartGroup:AddLabel("The map your mission will take place on.", true)
-Options.MissionMapDropdown:OnChanged(function()
-	local Value = Options.MissionMapDropdown.Value
-	if not Value then return end
-	Options.MissionObjectiveDropdown:SetValues(Missions[Value] or {})
-	DropdownConfig.Missions = DropdownConfig.Missions or {}
-	DropdownConfig.Missions.map = Value
-	SaveConfig(DropdownConfig)
-end)
-
-local initMissionMap = DropdownConfig.Missions and DropdownConfig.Missions.map or "Shiganshina"
-local initMissionObjVals = Missions[initMissionMap] or {}
-local initMissionObjDef = 1
-if DropdownConfig.Missions and DropdownConfig.Missions.objective then
-	initMissionObjDef = table.find(initMissionObjVals, DropdownConfig.Missions.objective) or 1
+-- ── Remove old GUI if re-injected ───────────────────────────
+if PlayerGui:FindFirstChild("TitanicHub") then
+    PlayerGui.TitanicHub:Destroy()
 end
 
-AutoStartGroup:AddDropdown("MissionObjectiveDropdown", {
-	Values = initMissionObjVals,
-	Default = initMissionObjDef,
-	Multi = false,
-	Text = "Mission Objective",
+-- ── Root ────────────────────────────────────────────────────
+local Screen = New("ScreenGui",{
+    Name="TitanicHub", ResetOnSpawn=false,
+    ZIndexBehavior=Enum.ZIndexBehavior.Sibling,
+    Parent=PlayerGui,
 })
-AutoStartGroup:AddLabel("The objective type for your mission.", true)
-Options.MissionObjectiveDropdown:OnChanged(function()
-	local Value = Options.MissionObjectiveDropdown.Value
-	DropdownConfig.Missions = DropdownConfig.Missions or {}
-	DropdownConfig.Missions.objective = Value
-	SaveConfig(DropdownConfig)
-end)
 
-AutoStartGroup:AddDropdown("MissionDifficultyDropdown", {
-	Values = {"Easy","Normal","Hard","Severe","Aberrant","Hardest"},
-	Default = DropdownConfig.Missions and table.find({"Easy","Normal","Hard","Severe","Aberrant","Hardest"}, DropdownConfig.Missions.difficulty) or 2,
-	Multi = false,
-	Text = "Mission Difficulty",
+-- ── Window 1120 × 650 ───────────────────────────────────────
+local WW,WH = 1120,650
+local Win = New("Frame",{
+    Size=UDim2.new(0,WW,0,WH),
+    Position=UDim2.new(.5,-WW/2,.5,-WH/2),
+    BackgroundColor3=C.BG0, BorderSizePixel=0, Parent=Screen,
 })
-AutoStartGroup:AddLabel("Hardest tries all difficulties until one works.", true)
-Options.MissionDifficultyDropdown:OnChanged(function()
-	local Value = Options.MissionDifficultyDropdown.Value
-	DropdownConfig.Missions = DropdownConfig.Missions or {}
-	DropdownConfig.Missions.difficulty = Value
-	SaveConfig(DropdownConfig)
-end)
+Corner(12,Win) Stroke(C.BOR,1,Win)
 
-AutoStartGroup:AddDivider()
-
-AutoStartGroup:AddDropdown("RaidMapDropdown", {
-	Values = {"Trost","Shiganshina","Stohess"},
-	Default = DropdownConfig.Raids and table.find({"Trost","Shiganshina","Stohess"}, DropdownConfig.Raids.map) or 1,
-	Multi = false,
-	Text = "Raid Map",
-})
-AutoStartGroup:AddLabel("Trost: Attack  •  Shiganshina: Armored  •  Stohess: Female", true)
-Options.RaidMapDropdown:OnChanged(function()
-	local Value = Options.RaidMapDropdown.Value
-	if not Value then return end
-	Options.RaidObjectiveDropdown:SetValues(Missions[Value] or {})
-	DropdownConfig.Raids = DropdownConfig.Raids or {}
-	DropdownConfig.Raids.map = Value
-	SaveConfig(DropdownConfig)
-end)
-
-local initRaidMap = DropdownConfig.Raids and DropdownConfig.Raids.map or "Trost"
-local initRaidObjVals = Missions[initRaidMap] or {}
-local initRaidObjDef = 1
-if DropdownConfig.Raids and DropdownConfig.Raids.objective then
-	initRaidObjDef = table.find(initRaidObjVals, DropdownConfig.Raids.objective) or 1
+-- drag
+do
+    local drag,ds,sp=false
+    local db=New("Frame",{Size=UDim2.new(1,0,0,38),BackgroundTransparency=1,ZIndex=20,Parent=Win})
+    db.InputBegan:Connect(function(i)
+        if i.UserInputType==Enum.UserInputType.MouseButton1 then
+            drag=true ds=i.Position sp=Win.Position end end)
+    UserInputService.InputChanged:Connect(function(i)
+        if drag and i.UserInputType==Enum.UserInputType.MouseMovement then
+            local d=i.Position-ds
+            Win.Position=UDim2.new(sp.X.Scale,sp.X.Offset+d.X,sp.Y.Scale,sp.Y.Offset+d.Y) end end)
+    UserInputService.InputEnded:Connect(function(i)
+        if i.UserInputType==Enum.UserInputType.MouseButton1 then drag=false end end)
 end
 
-AutoStartGroup:AddDropdown("RaidObjectiveDropdown", {
-	Values = initRaidObjVals,
-	Default = initRaidObjDef,
-	Multi = false,
-	Text = "Raid Objective",
+-- ── Top bar ─────────────────────────────────────────────────
+local TopBar = New("Frame",{
+    Size=UDim2.new(1,0,0,38), BackgroundColor3=C.BG1,
+    BorderSizePixel=0, ZIndex=5, Parent=Win,
 })
-AutoStartGroup:AddLabel("The objective for the selected raid map.", true)
-Options.RaidObjectiveDropdown:OnChanged(function()
-	local Value = Options.RaidObjectiveDropdown.Value
-	DropdownConfig.Raids = DropdownConfig.Raids or {}
-	DropdownConfig.Raids.objective = Value
-	SaveConfig(DropdownConfig)
+Corner(12,TopBar)
+New("Frame",{Size=UDim2.new(1,0,0,12),Position=UDim2.new(0,0,1,-12),
+    BackgroundColor3=C.BG1,BorderSizePixel=0,Parent=TopBar})
+
+New("TextLabel",{Text="  ⚓  TITANIC HUB",Font=Enum.Font.GothamBold,
+    TextSize=14,TextColor3=C.WHITE,BackgroundTransparency=1,
+    Size=UDim2.new(0,300,1,0),TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6,Parent=TopBar})
+New("TextLabel",{Text="AOTR Script  |  by ZEKE",Font=Enum.Font.Gotham,
+    TextSize=11,TextColor3=C.DIM,BackgroundTransparency=1,
+    Size=UDim2.new(0,240,1,0),Position=UDim2.new(0,240,0,0),
+    TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6,Parent=TopBar})
+
+-- window control buttons
+local BtnHolder=New("Frame",{Size=UDim2.new(0,90,0,22),
+    Position=UDim2.new(1,-96,0,8),BackgroundTransparency=1,ZIndex=6,Parent=TopBar})
+List(Enum.FillDirection.Horizontal,4,BtnHolder)
+for _,cfg in ipairs({{"─",C.DIM},{"□",C.DIM},{"✕",C.RED}}) do
+    local b=New("TextButton",{Text=cfg[1],Font=Enum.Font.GothamBold,TextSize=13,
+        TextColor3=cfg[2],Size=UDim2.new(0,26,0,22),
+        BackgroundColor3=C.BG3,BorderSizePixel=0,AutoButtonColor=false,ZIndex=7,Parent=BtnHolder})
+    Corner(5,b)
+    b.MouseEnter:Connect(function() Tw(b,{BackgroundColor3=C.BG4}) end)
+    b.MouseLeave:Connect(function() Tw(b,{BackgroundColor3=C.BG3}) end)
+    if cfg[1]=="✕" then b.MouseButton1Click:Connect(function() Screen:Destroy() end) end
+end
+
+-- ============================================================
+--  SIDEBAR  220px
+-- ============================================================
+local SB = New("Frame",{
+    Name="Sidebar",Size=UDim2.new(0,220,1,-38),
+    Position=UDim2.new(0,0,0,38),
+    BackgroundColor3=C.BG1,BorderSizePixel=0,Parent=Win,
+})
+New("Frame",{Size=UDim2.new(0,1,1,0),Position=UDim2.new(1,-1,0,0),
+    BackgroundColor3=C.BOR,BorderSizePixel=0,Parent=SB})
+
+-- brand
+local Brand=New("Frame",{Size=UDim2.new(1,0,0,82),BackgroundTransparency=1,Parent=SB})
+Pad(14,14,0,14,Brand)
+local Icon=New("Frame",{Size=UDim2.new(0,38,0,38),BackgroundColor3=C.ACC,BorderSizePixel=0,Parent=Brand})
+Corner(9,Icon)
+New("TextLabel",{Text="⚓",Font=Enum.Font.GothamBold,TextSize=20,TextColor3=C.WHITE,
+    BackgroundTransparency=1,Size=UDim2.new(1,0,1,0),
+    TextXAlignment=Enum.TextXAlignment.Center,TextYAlignment=Enum.TextYAlignment.Center,Parent=Icon})
+New("TextLabel",{Text="TITANIC HUB",Font=Enum.Font.GothamBold,TextSize=13,TextColor3=C.WHITE,
+    BackgroundTransparency=1,Position=UDim2.new(0,48,0,3),Size=UDim2.new(1,-48,0,16),
+    TextXAlignment=Enum.TextXAlignment.Left,Parent=Brand})
+New("TextLabel",{Text="AOTR Script",Font=Enum.Font.Gotham,TextSize=10,TextColor3=C.DIM,
+    BackgroundTransparency=1,Position=UDim2.new(0,48,0,21),Size=UDim2.new(1,-48,0,14),
+    TextXAlignment=Enum.TextXAlignment.Left,Parent=Brand})
+New("TextLabel",{Text="by ZEKE",Font=Enum.Font.Gotham,TextSize=10,TextColor3=C.ACC3,
+    BackgroundTransparency=1,Position=UDim2.new(0,48,0,37),Size=UDim2.new(1,-48,0,14),
+    TextXAlignment=Enum.TextXAlignment.Left,Parent=Brand})
+New("Frame",{Size=UDim2.new(1,-24,0,1),Position=UDim2.new(0,12,0,83),
+    BackgroundColor3=C.BOR,BorderSizePixel=0,Parent=SB})
+
+-- nav list
+local NavScroll=New("ScrollingFrame",{
+    Size=UDim2.new(1,0,1,-178),Position=UDim2.new(0,0,0,85),
+    BackgroundTransparency=1,ScrollBarThickness=0,
+    CanvasSize=UDim2.new(0,0,0,0),AutomaticCanvasSize=Enum.AutomaticSize.Y,
+    Parent=SB,
+})
+Pad(4,8,4,8,NavScroll)
+List(Enum.FillDirection.Vertical,2,NavScroll)
+
+local NAV_ITEMS={
+    {icon="🏠",label="Home",       tab="Main"},
+    {icon="⚙️",label="Main",       tab="Main"},
+    {icon="🤖",label="Auto Farm",  tab="Main"},
+    {icon="⚔️",label="Combat",     tab="Main"},
+    {icon="📊",label="Stats",      tab="Main"},
+    {icon="📍",label="Teleport",   tab="Misc"},
+    {icon="🔧",label="Misc",       tab="Misc"},
+    {icon="⚙", label="Settings",  tab="Settings"},
+    {icon="🔑",label="Key System", tab="Settings"},
+    {icon="💬",label="Discord",    tab="Main"},
+}
+
+local activeNavBtn=nil
+local PageFrames={}  -- filled below
+local function switchNav(btn,bar,lbl,targetTab)
+    if activeNavBtn and activeNavBtn~=btn then
+        local ob=activeNavBtn
+        Tw(ob.btn,{BackgroundTransparency=1})
+        Tw(ob.bar,{BackgroundTransparency=1})
+        ob.lbl.Font=Enum.Font.Gotham
+        ob.lbl.TextColor3=C.MUTED
+    end
+    activeNavBtn={btn=btn,bar=bar,lbl=lbl}
+    Tw(btn,{BackgroundTransparency=0.75,BackgroundColor3=C.ACC})
+    Tw(bar,{BackgroundTransparency=0})
+    lbl.Font=Enum.Font.GothamBold
+    lbl.TextColor3=C.WHITE
+    -- show matching page
+    for name,frame in pairs(PageFrames) do
+        frame.Visible = (name==targetTab)
+    end
+end
+
+for i,item in ipairs(NAV_ITEMS) do
+    local row=New("TextButton",{
+        Text="",Size=UDim2.new(1,0,0,36),
+        BackgroundColor3=C.ACC,BackgroundTransparency=1,
+        BorderSizePixel=0,AutoButtonColor=false,LayoutOrder=i,Parent=NavScroll,
+    })
+    Corner(6,row)
+    local bar=New("Frame",{Size=UDim2.new(0,3,0.7,0),Position=UDim2.new(0,0,0.15,0),
+        BackgroundColor3=C.ACC2,BackgroundTransparency=1,BorderSizePixel=0,Parent=row})
+    Corner(2,bar)
+    local lbl=New("TextLabel",{Text=item.icon.."  "..item.label,
+        Font=Enum.Font.Gotham,TextSize=13,TextColor3=C.MUTED,
+        BackgroundTransparency=1,Size=UDim2.new(1,-12,1,0),
+        Position=UDim2.new(0,10,0,0),TextXAlignment=Enum.TextXAlignment.Left,Parent=row})
+    row.MouseEnter:Connect(function()
+        if activeNavBtn and activeNavBtn.btn~=row then
+            Tw(row,{BackgroundTransparency=0.88}) end end)
+    row.MouseLeave:Connect(function()
+        if activeNavBtn and activeNavBtn.btn~=row then
+            Tw(row,{BackgroundTransparency=1}) end end)
+    row.MouseButton1Click:Connect(function() switchNav(row,bar,lbl,item.tab) end)
+    if i==1 then
+        -- activate Home by default (deferred below after PageFrames built)
+        task.defer(function() switchNav(row,bar,lbl,item.tab) end)
+    end
+end
+
+-- User Panel (bottom sidebar)
+New("Frame",{Size=UDim2.new(1,-24,0,1),Position=UDim2.new(0,12,1,-96),
+    BackgroundColor3=C.BOR,BorderSizePixel=0,Parent=SB})
+local UP=New("Frame",{Size=UDim2.new(1,0,0,92),Position=UDim2.new(0,0,1,-94),
+    BackgroundTransparency=1,Parent=SB})
+Pad(10,12,0,12,UP)
+local Av=New("Frame",{Size=UDim2.new(0,36,0,36),BackgroundColor3=C.ACC,BorderSizePixel=0,Parent=UP})
+Corner(18,Av)
+New("TextLabel",{Text="Z",Font=Enum.Font.GothamBold,TextSize=16,TextColor3=C.WHITE,
+    BackgroundTransparency=1,Size=UDim2.new(1,0,1,0),
+    TextXAlignment=Enum.TextXAlignment.Center,TextYAlignment=Enum.TextYAlignment.Center,Parent=Av})
+New("TextLabel",{Text="Welcome,",Font=Enum.Font.Gotham,TextSize=10,TextColor3=C.DIM,
+    BackgroundTransparency=1,Position=UDim2.new(0,46,0,0),Size=UDim2.new(1,-46,0,14),
+    TextXAlignment=Enum.TextXAlignment.Left,Parent=UP})
+New("TextLabel",{Text="User#ZEKE",Font=Enum.Font.GothamBold,TextSize=13,TextColor3=C.WHITE,
+    BackgroundTransparency=1,Position=UDim2.new(0,46,0,14),Size=UDim2.new(1,-46,0,16),
+    TextXAlignment=Enum.TextXAlignment.Left,Parent=UP})
+local PB=New("Frame",{Size=UDim2.new(0,60,0,16),Position=UDim2.new(0,46,0,32),
+    BackgroundColor3=C.GOLD,BorderSizePixel=0,Parent=UP})
+Corner(4,PB)
+New("TextLabel",{Text="PREMIUM",Font=Enum.Font.GothamBold,TextSize=9,
+    TextColor3=Color3.new(0,0,0),BackgroundTransparency=1,
+    Size=UDim2.new(1,0,1,0),TextXAlignment=Enum.TextXAlignment.Center,Parent=PB})
+local GDot=New("Frame",{Size=UDim2.new(0,7,0,7),Position=UDim2.new(0,0,0,5),
+    BackgroundColor3=C.GREEN,BorderSizePixel=0,Parent=New("Frame",{
+        Size=UDim2.new(1,-24,0,16),Position=UDim2.new(0,12,0,54),
+        BackgroundTransparency=1,Parent=UP})})
+Corner(4,GDot)
+New("TextLabel",{Text="Online",Font=Enum.Font.Gotham,TextSize=11,TextColor3=C.DIM,
+    BackgroundTransparency=1,Position=UDim2.new(0,12,0,-1),Size=UDim2.new(1,-12,1,0),
+    TextXAlignment=Enum.TextXAlignment.Left,Parent=GDot.Parent})
+New("TextLabel",{Text="TitanicHub v1.0.0  ·  Always Undetected",
+    Font=Enum.Font.Gotham,TextSize=9,TextColor3=C.DIM,BackgroundTransparency=1,
+    Position=UDim2.new(0,12,0,70),Size=UDim2.new(1,-24,0,14),
+    TextXAlignment=Enum.TextXAlignment.Left,Parent=UP})
+
+-- ============================================================
+--  CONTENT AREA
+-- ============================================================
+local Content=New("Frame",{
+    Size=UDim2.new(1,-220,1,-38),
+    Position=UDim2.new(0,220,0,38),
+    BackgroundColor3=C.BG0,BorderSizePixel=0,Parent=Win,
+})
+
+-- ── Shared widget builders ───────────────────────────────────
+local function Panel(parent,x,y,w,h)
+    local f=New("Frame",{Size=UDim2.new(0,w,0,h),Position=UDim2.new(0,x,0,y),
+        BackgroundColor3=C.BG2,BorderSizePixel=0,Parent=parent})
+    Corner(8,f) Stroke(C.BOR,1,f)
+    return f
+end
+local function PanelHeader(parent,iconTxt,titleTxt)
+    local hdr=New("Frame",{Size=UDim2.new(1,-24,0,28),Position=UDim2.new(0,12,0,10),
+        BackgroundTransparency=1,Parent=parent})
+    New("TextLabel",{Text=iconTxt,Font=Enum.Font.GothamBold,TextSize=14,TextColor3=C.ACC2,
+        BackgroundTransparency=1,Size=UDim2.new(0,22,1,0),
+        TextXAlignment=Enum.TextXAlignment.Center,Parent=hdr})
+    New("TextLabel",{Text=titleTxt,Font=Enum.Font.GothamBold,TextSize=12,TextColor3=C.WHITE,
+        BackgroundTransparency=1,Position=UDim2.new(0,26,0,0),Size=UDim2.new(1,-26,1,0),
+        TextXAlignment=Enum.TextXAlignment.Left,Parent=hdr})
+    New("Frame",{Size=UDim2.new(1,-24,0,1),Position=UDim2.new(0,12,0,40),
+        BackgroundColor3=C.BOR,BorderSizePixel=0,Parent=parent})
+    return hdr
+end
+
+-- Toggle builder → returns a function to read value
+local function MakeToggle(parent,yPos,labelTxt,default)
+    local row=New("Frame",{Size=UDim2.new(1,-24,0,28),Position=UDim2.new(0,12,0,yPos),
+        BackgroundTransparency=1,Parent=parent})
+    New("TextLabel",{Text=labelTxt,Font=Enum.Font.Gotham,TextSize=12,TextColor3=C.MUTED,
+        BackgroundTransparency=1,Size=UDim2.new(1,-46,1,0),
+        TextXAlignment=Enum.TextXAlignment.Left,Parent=row})
+    local track=New("Frame",{Size=UDim2.new(0,34,0,18),
+        Position=UDim2.new(1,-34,0.5,-9),
+        BackgroundColor3=default and C.ACC or C.BG4,
+        BorderSizePixel=0,Parent=row})
+    Corner(9,track) Stroke(C.BOR2,1,track)
+    local thumb=New("Frame",{
+        Size=UDim2.new(0,12,0,12),
+        Position=default and UDim2.new(1,-14,0.5,-6) or UDim2.new(0,2,0.5,-6),
+        BackgroundColor3=default and C.WHITE or C.DIM,
+        BorderSizePixel=0,Parent=track})
+    Corner(6,thumb)
+    local val=default or false
+    local btn=New("TextButton",{Text="",Size=UDim2.new(1,0,1,0),
+        BackgroundTransparency=1,Parent=track})
+    btn.MouseButton1Click:Connect(function()
+        val=not val
+        Tw(track,{BackgroundColor3=val and C.ACC or C.BG4})
+        Tw(thumb,{Position=val and UDim2.new(1,-14,0.5,-6) or UDim2.new(0,2,0.5,-6),
+            BackgroundColor3=val and C.WHITE or C.DIM})
+    end)
+    return function() return val end, function(v)
+        val=v
+        Tw(track,{BackgroundColor3=val and C.ACC or C.BG4})
+        Tw(thumb,{Position=val and UDim2.new(1,-14,0.5,-6) or UDim2.new(0,2,0.5,-6),
+            BackgroundColor3=val and C.WHITE or C.DIM})
+    end
+end
+
+-- Slider builder → returns getter
+local function MakeSlider(parent,yPos,labelTxt,minV,maxV,default)
+    local row=New("Frame",{Size=UDim2.new(1,-24,0,38),Position=UDim2.new(0,12,0,yPos),
+        BackgroundTransparency=1,Parent=parent})
+    New("TextLabel",{Text=labelTxt,Font=Enum.Font.Gotham,TextSize=11,TextColor3=C.MUTED,
+        BackgroundTransparency=1,Size=UDim2.new(0.7,0,0,16),
+        TextXAlignment=Enum.TextXAlignment.Left,Parent=row})
+    local valLbl=New("TextLabel",{Text=tostring(default),Font=Enum.Font.GothamBold,
+        TextSize=12,TextColor3=C.WHITE,BackgroundTransparency=1,
+        Size=UDim2.new(0.3,0,0,16),TextXAlignment=Enum.TextXAlignment.Right,Parent=row})
+    local track=New("Frame",{Size=UDim2.new(1,0,0,4),Position=UDim2.new(0,0,0,22),
+        BackgroundColor3=C.BG4,BorderSizePixel=0,Parent=row})
+    Corner(2,track)
+    local pct=(default-minV)/(maxV-minV)
+    local fill=New("Frame",{Size=UDim2.new(pct,0,1,0),BackgroundColor3=C.ACC2,
+        BorderSizePixel=0,Parent=track})
+    Corner(2,fill)
+    local thumb=New("Frame",{Size=UDim2.new(0,14,0,14),
+        Position=UDim2.new(pct,-7,0.5,-7),
+        BackgroundColor3=C.ACC2,BorderSizePixel=0,Parent=track})
+    Corner(7,thumb)
+    local val=default
+    local dragging=false
+    local db=New("TextButton",{Text="",Size=UDim2.new(1,28,1,20),
+        Position=UDim2.new(0,-14,0,-8),BackgroundTransparency=1,Parent=track})
+    db.MouseButton1Down:Connect(function() dragging=true end)
+    UserInputService.InputEnded:Connect(function(i)
+        if i.UserInputType==Enum.UserInputType.MouseButton1 then dragging=false end end)
+    UserInputService.InputChanged:Connect(function(i)
+        if dragging and i.UserInputType==Enum.UserInputType.MouseMovement then
+            local abs=track.AbsolutePosition
+            local sz=track.AbsoluteSize
+            local rel=math.clamp((i.Position.X-abs.X)/sz.X,0,1)
+            val=math.floor(minV+(maxV-minV)*rel)
+            valLbl.Text=tostring(val)
+            fill.Size=UDim2.new(rel,0,1,0)
+            thumb.Position=UDim2.new(rel,-7,0.5,-7)
+        end end)
+    return function() return val end
+end
+
+-- Dropdown builder
+local function MakeDropdown(parent,yPos,labelTxt,values,default)
+    local row=New("Frame",{Size=UDim2.new(1,-24,0,50),Position=UDim2.new(0,12,0,yPos),
+        BackgroundTransparency=1,Parent=parent})
+    New("TextLabel",{Text=labelTxt,Font=Enum.Font.Gotham,TextSize=11,TextColor3=C.MUTED,
+        BackgroundTransparency=1,Size=UDim2.new(1,0,0,16),
+        TextXAlignment=Enum.TextXAlignment.Left,Parent=row})
+    local box=New("Frame",{Size=UDim2.new(1,0,0,28),Position=UDim2.new(0,0,0,18),
+        BackgroundColor3=C.BG4,BorderSizePixel=0,Parent=row})
+    Corner(6,box) Stroke(C.BOR2,1,box)
+    local sel=default or (values[1] or "")
+    local selLbl=New("TextLabel",{Text=sel,Font=Enum.Font.Gotham,TextSize=12,TextColor3=C.WHITE,
+        BackgroundTransparency=1,Size=UDim2.new(1,-30,1,0),
+        Position=UDim2.new(0,8,0,0),TextXAlignment=Enum.TextXAlignment.Left,Parent=box})
+    New("TextLabel",{Text="▾",Font=Enum.Font.GothamBold,TextSize=14,TextColor3=C.ACC2,
+        BackgroundTransparency=1,Size=UDim2.new(0,20,1,0),
+        Position=UDim2.new(1,-24,0,0),TextXAlignment=Enum.TextXAlignment.Center,Parent=box})
+    -- dropdown list
+    local list=New("Frame",{Size=UDim2.new(1,0,0,#values*26+4),
+        Position=UDim2.new(0,0,1,2),BackgroundColor3=C.BG3,
+        BorderSizePixel=0,Visible=false,ZIndex=20,Parent=box})
+    Corner(6,list) Stroke(C.BOR2,1,list)
+    Pad(2,0,2,0,list)
+    List(Enum.FillDirection.Vertical,0,list)
+    for _,v in ipairs(values) do
+        local opt=New("TextButton",{Text=v,Font=Enum.Font.Gotham,TextSize=12,
+            TextColor3=C.MUTED,Size=UDim2.new(1,0,0,24),
+            BackgroundColor3=C.BG3,BackgroundTransparency=1,
+            BorderSizePixel=0,AutoButtonColor=false,ZIndex=21,Parent=list})
+        opt.MouseEnter:Connect(function() Tw(opt,{BackgroundTransparency=0.7,TextColor3=C.WHITE}) end)
+        opt.MouseLeave:Connect(function() Tw(opt,{BackgroundTransparency=1,TextColor3=C.MUTED}) end)
+        opt.MouseButton1Click:Connect(function()
+            sel=v selLbl.Text=v list.Visible=false end)
+    end
+    local tog=New("TextButton",{Text="",Size=UDim2.new(1,0,1,0),
+        BackgroundTransparency=1,ZIndex=2,Parent=box})
+    tog.MouseButton1Click:Connect(function() list.Visible=not list.Visible end)
+    return function() return sel end
+end
+
+-- Action Button
+local function MakeButton(parent,yPos,labelTxt,col,onClick)
+    col=col or C.ACC
+    local btn=New("TextButton",{
+        Text=labelTxt,Font=Enum.Font.GothamBold,TextSize=13,TextColor3=C.WHITE,
+        Size=UDim2.new(1,-24,0,32),Position=UDim2.new(0,12,0,yPos),
+        BackgroundColor3=col,BorderSizePixel=0,AutoButtonColor=false,Parent=parent})
+    Corner(7,btn)
+    btn.MouseEnter:Connect(function() Tw(btn,{BackgroundColor3=Color3.new(
+        math.min(col.R+0.06,1),math.min(col.G+0.06,1),math.min(col.B+0.06,1))}) end)
+    btn.MouseLeave:Connect(function() Tw(btn,{BackgroundColor3=col}) end)
+    if onClick then btn.MouseButton1Click:Connect(onClick) end
+    return btn
+end
+
+-- Label
+local function MakeLabel(parent,yPos,txt,col)
+    return New("TextLabel",{Text=txt,Font=Enum.Font.Gotham,TextSize=11,
+        TextColor3=col or C.DIM,BackgroundTransparency=1,
+        Size=UDim2.new(1,-24,0,28),Position=UDim2.new(0,12,0,yPos),
+        TextXAlignment=Enum.TextXAlignment.Left,TextWrapped=true,Parent=parent})
+end
+
+-- Input box
+local function MakeInput(parent,yPos,labelTxt,placeholder)
+    local row=New("Frame",{Size=UDim2.new(1,-24,0,50),Position=UDim2.new(0,12,0,yPos),
+        BackgroundTransparency=1,Parent=parent})
+    New("TextLabel",{Text=labelTxt,Font=Enum.Font.Gotham,TextSize=11,TextColor3=C.MUTED,
+        BackgroundTransparency=1,Size=UDim2.new(1,0,0,16),
+        TextXAlignment=Enum.TextXAlignment.Left,Parent=row})
+    local box=New("TextBox",{PlaceholderText=placeholder or "",Text="",
+        Font=Enum.Font.Gotham,TextSize=12,TextColor3=C.WHITE,
+        PlaceholderColor3=C.DIM,
+        Size=UDim2.new(1,0,0,28),Position=UDim2.new(0,0,0,18),
+        BackgroundColor3=C.BG4,BorderSizePixel=0,
+        ClearTextOnFocus=false,Parent=row})
+    Corner(6,box) Stroke(C.BOR2,1,box)
+    Pad(0,8,0,8,box)
+    return function() return box.Text end
+end
+
+-- ============================================================
+--  PAGE: MAIN TAB
+-- ============================================================
+local MainPage=New("Frame",{
+    Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,
+    Visible=true,Parent=Content,
+})
+PageFrames["Main"]=MainPage
+
+-- page header
+New("TextLabel",{Text="Dashboard",Font=Enum.Font.GothamBold,TextSize=22,
+    TextColor3=C.ACC2,BackgroundTransparency=1,
+    Size=UDim2.new(1,-20,0,30),Position=UDim2.new(0,16,0,10),
+    TextXAlignment=Enum.TextXAlignment.Left,Parent=MainPage})
+New("TextLabel",{Text="Overview of all features and system status.",
+    Font=Enum.Font.Gotham,TextSize=12,TextColor3=C.DIM,BackgroundTransparency=1,
+    Size=UDim2.new(1,-20,0,18),Position=UDim2.new(0,16,0,38),
+    TextXAlignment=Enum.TextXAlignment.Left,Parent=MainPage})
+
+-- ── Status Cards row ────────────────────────────────────────
+local CW=194 local CY=64 local CX=16
+local function StatusCard(x,accentCol,icon,topLbl,valTxt,valCol,noteTxt)
+    local f=Panel(MainPage,x,CY,CW,80)
+    New("Frame",{Size=UDim2.new(1,0,0,2),BackgroundColor3=accentCol,
+        BorderSizePixel=0,Parent=f})  -- top accent strip
+    Corner(8,f)
+    -- icon circle
+    local ic=New("Frame",{Size=UDim2.new(0,36,0,36),Position=UDim2.new(0,10,0,22),
+        BackgroundColor3=accentCol,BackgroundTransparency=0.8,BorderSizePixel=0,Parent=f})
+    Corner(18,ic)
+    New("TextLabel",{Text=icon,Font=Enum.Font.GothamBold,TextSize=18,
+        TextColor3=accentCol,BackgroundTransparency=1,
+        Size=UDim2.new(1,0,1,0),TextXAlignment=Enum.TextXAlignment.Center,
+        TextYAlignment=Enum.TextYAlignment.Center,Parent=ic})
+    New("TextLabel",{Text=topLbl,Font=Enum.Font.Gotham,TextSize=9,TextColor3=C.DIM,
+        BackgroundTransparency=1,Position=UDim2.new(0,54,0,16),
+        Size=UDim2.new(1,-60,0,14),TextXAlignment=Enum.TextXAlignment.Left,Parent=f})
+    New("TextLabel",{Text=valTxt,Font=Enum.Font.GothamBold,TextSize=16,
+        TextColor3=valCol,BackgroundTransparency=1,
+        Position=UDim2.new(0,54,0,30),Size=UDim2.new(1,-60,0,22),
+        TextXAlignment=Enum.TextXAlignment.Left,Parent=f})
+    New("TextLabel",{Text=noteTxt,Font=Enum.Font.Gotham,TextSize=9,TextColor3=C.DIM,
+        BackgroundTransparency=1,Position=UDim2.new(0,54,0,52),
+        Size=UDim2.new(1,-60,0,14),TextXAlignment=Enum.TextXAlignment.Left,Parent=f})
+end
+StatusCard(CX,              C.GREEN,"✔","Script Status","Active",  C.GREEN,"Last update: Today")
+StatusCard(CX+CW+6,         C.ACC,  "🎮","Game",         "AOTR",    C.ACC2, "Attack on Titan Revolution")
+StatusCard(CX+(CW+6)*2,     C.CYAN, ">_","Executor",     "Delta",   C.CYAN, "Recommended")
+StatusCard(CX+(CW+6)*3,     C.GOLD, "🔑","Key Status",   "Premium", C.GOLD, "Valid Until: Lifetime")
+
+-- ── Main Features panel ─────────────────────────────────────
+local FeatPanel=Panel(MainPage,16,158,370,270)
+PanelHeader(FeatPanel,"★","MAIN FEATURES")
+
+local getAutoFarm,setAutoFarm=MakeToggle(FeatPanel,50,"Auto Farm",false)
+local getAutoGrind,_=MakeToggle(FeatPanel,82,"Auto Grind",false)
+local getAutoSpin,_=MakeToggle(FeatPanel,114,"Auto Spin",false)
+local getAutoUpgrade,_=MakeToggle(FeatPanel,146,"Auto Upgrade",false)
+local getAutoChestT,_=MakeToggle(FeatPanel,178,"Auto Open Chests",false)
+local getAutoRetryT,_=MakeToggle(FeatPanel,210,"Auto Retry",false)
+
+MakeButton(FeatPanel,242,"▶  Start All Features",C.ACC,function()
+    setAutoFarm(true)
 end)
 
-AutoStartGroup:AddDropdown("RaidDifficultyDropdown", {
-	Values = {"Hard","Severe","Aberrant","Hardest"},
-	Default = DropdownConfig.Raids and table.find({"Hard","Severe","Aberrant","Hardest"}, DropdownConfig.Raids.difficulty) or 1,
-	Multi = false,
-	Text = "Raid Difficulty",
-})
-AutoStartGroup:AddLabel("Hardest tries all raid difficulties descending.", true)
-Options.RaidDifficultyDropdown:OnChanged(function()
-	local Value = Options.RaidDifficultyDropdown.Value
-	DropdownConfig.Raids = DropdownConfig.Raids or {}
-	DropdownConfig.Raids.difficulty = Value
-	SaveConfig(DropdownConfig)
+-- ── Player panel ────────────────────────────────────────────
+local PlrPanel=Panel(MainPage,400,158,348,270)
+PanelHeader(PlrPanel,"👤","PLAYER")
+
+local getWalkSpeed=MakeSlider(PlrPanel,50,"WalkSpeed",16,500,250)
+local getJumpPower=MakeSlider(PlrPanel,96,"JumpPower",0,1000,500)
+local getNoClip,_=MakeToggle(PlrPanel,148,"NoClip",true)
+local getInfStam,_=MakeToggle(PlrPanel,180,"Infinite Stamina",true)
+local getAntiStun,_=MakeToggle(PlrPanel,212,"Anti-Stun",true)
+
+MakeButton(PlrPanel,242,"↺  Reset Player",C.BG3,function()
+    local char=lp.Character
+    if char then
+        local h=char:FindFirstChildOfClass("Humanoid")
+        if h then h.WalkSpeed=16 h.JumpPower=50 end
+    end
 end)
 
-AutoStartGroup:AddDivider()
+-- ── Teleports panel ─────────────────────────────────────────
+local TpPanel=Panel(MainPage,762,158,140,270)
+PanelHeader(TpPanel,"📍","TELEPORTS")
 
-AutoStartGroup:AddDropdown("ModifiersDropdown", {
-	Values = {"No Perks","No Skills","No Talents","Nightmare","Oddball","Injury Prone","Chronic Injuries","Fog","Glass Cannon","Time Trial","Boring","Simple"},
-	Default = {},
-	Multi = true,
-	Text = "Modifiers",
+local teleports={
+    {name="Eren's City"},
+    {name="Utopia District"},
+    {name="Stohess"},
+    {name="Underground City"},
+    {name="Crystal Cave"},
+    {name="Shiganshina"},
+}
+for i,tp in ipairs(teleports) do
+    local btn=New("TextButton",{
+        Text=tp.name.."  ›",Font=Enum.Font.Gotham,TextSize=11,
+        TextColor3=C.MUTED,Size=UDim2.new(1,-20,0,26),
+        Position=UDim2.new(0,10,0,44+(i-1)*30),
+        BackgroundColor3=C.BG3,BorderSizePixel=0,
+        AutoButtonColor=false,TextXAlignment=Enum.TextXAlignment.Left,
+        Parent=TpPanel,
+    })
+    Corner(5,btn) Stroke(C.BOR,1,btn)
+    Pad(0,6,0,8,btn)
+    btn.MouseEnter:Connect(function()
+        Tw(btn,{BackgroundColor3=C.BG4,TextColor3=C.WHITE}) end)
+    btn.MouseLeave:Connect(function()
+        Tw(btn,{BackgroundColor3=C.BG3,TextColor3=C.MUTED}) end)
+end
+
+-- ── System Log ──────────────────────────────────────────────
+local LogPanel=Panel(MainPage,16,442,530,148)
+PanelHeader(LogPanel,"</>","SYSTEM LOG")
+local LogScroll=New("ScrollingFrame",{
+    Size=UDim2.new(1,-24,1,-54),Position=UDim2.new(0,12,0,48),
+    BackgroundTransparency=1,ScrollBarThickness=2,
+    ScrollBarImageColor3=C.BOR2,
+    CanvasSize=UDim2.new(0,0,0,0),AutomaticCanvasSize=Enum.AutomaticSize.Y,
+    Parent=LogPanel,
 })
-AutoStartGroup:AddLabel("Optional challenge modifiers applied at mission start.", true)
+List(Enum.FillDirection.Vertical,0,LogScroll)
 
--- Trigger type initialization
-task.defer(function()
-	task.wait(0.2)
-	local savedType = DropdownConfig._lastType or "Missions"
-	Options.StartTypeDropdown:SetValue(savedType)
+local logColors={["green"]=C.GREEN,["gold"]=C.GOLD,["cyan"]=C.CYAN,["red"]=C.RED,["dim"]=C.DIM}
+local function LogWrite(msg,col)
+    local t=os.date("[%H:%M:%S] ")
+    local lbl=New("TextLabel",{
+        Text=t..msg,Font=Enum.Font.Code,TextSize=11,
+        TextColor3=logColors[col] or C.MUTED,BackgroundTransparency=1,
+        Size=UDim2.new(1,0,0,18),TextXAlignment=Enum.TextXAlignment.Left,
+        Parent=LogScroll,
+    })
+    Pad(0,4,0,4,lbl)
+    task.defer(function()
+        LogScroll.CanvasPosition=Vector2.new(0,LogScroll.AbsoluteCanvasSize.Y) end)
+    return lbl
+end
+
+LogWrite("Script loaded successfully.","green")
+LogWrite("Key verified.  Premium access granted.","gold")
+LogWrite("Welcome back, User#ZEKE!","cyan")
+
+-- helper so existing code can still call UpdateStatus
+getgenv().CurrentStatusLabel = {SetText=function(_,t) LogWrite(t,"dim") end}
+function UpdateStatus(text) LogWrite("Status: "..text,"dim") end
+
+-- ── Quick Actions ────────────────────────────────────────────
+local QAPanel=Panel(MainPage,560,442,348,148)
+PanelHeader(QAPanel,"⚡","QUICK ACTIONS")
+local QAGrid=New("Frame",{Size=UDim2.new(1,-24,0,80),Position=UDim2.new(0,12,0,52),
+    BackgroundTransparency=1,Parent=QAPanel})
+New("UIGridLayout",{CellSize=UDim2.new(0.5,-4,0,32),CellPaddingY=UDim.new(0,6),
+    SortOrder=Enum.SortOrder.LayoutOrder,Parent=QAGrid})
+
+local function QBtn(lbl,col,cb)
+    local b=New("TextButton",{Text=lbl,Font=Enum.Font.GothamBold,TextSize=12,
+        TextColor3=col==C.RED and C.RED or C.WHITE,
+        BackgroundColor3=col==C.RED and Color3.fromRGB(60,15,15) or C.BG3,
+        BorderSizePixel=0,AutoButtonColor=false,Parent=QAGrid})
+    Corner(6,b)
+    Stroke(col==C.RED and Color3.fromRGB(100,30,30) or C.BOR2,1,b)
+    b.MouseEnter:Connect(function() Tw(b,{BackgroundColor3=C.BG4}) end)
+    b.MouseLeave:Connect(function() Tw(b,{BackgroundColor3=col==C.RED and Color3.fromRGB(60,15,15) or C.BG3}) end)
+    if cb then b.MouseButton1Click:Connect(cb) end
+end
+QBtn("↺  Rejoin",C.BG3,function()
+    local TS=game:GetService("TeleportService")
+    TS:Teleport(game.PlaceId,lp)
+end)
+QBtn("⇄  Server Hop",C.BG3,function()
+    local TS=game:GetService("TeleportService")
+    local pages=TS:GetSortedGameInstances(game.PlaceId,10)
+    if pages and pages[1] then TS:TeleportToPlaceInstance(game.PlaceId,pages[1].Id,lp) end
+end)
+QBtn("■  Stop Script",C.RED,function()
+    Screen:Destroy()
 end)
 
--- ==========================================
--- LOBBY › AUTOMATION TAB : Upgrades Groupbox
--- ==========================================
-
-UpgradesGroup:AddToggle("AutoUpgradeToggle", {
-	Text = "Upgrade Gear",
-	Default = false,
+-- ============================================================
+--  PAGE: MISC TAB
+-- ============================================================
+local MiscPage=New("Frame",{
+    Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,
+    Visible=false,Parent=Content,
 })
-UpgradesGroup:AddLabel("Automatically upgrades your gear with Gold.", true)
-Toggles.AutoUpgradeToggle:OnChanged(function()
-	getgenv().AutoUpgrade = Toggles.AutoUpgradeToggle.Value
-	if getgenv().AutoUpgrade then
-		if game.PlaceId ~= 14916516914 then return end
-		task.spawn(function()
-			local plrData = GetPlayerData()
-			if not plrData or not plrData.Slots then task.wait(1) return end
+PageFrames["Misc"]=MiscPage
 
-			while getgenv().AutoUpgrade do
-				local slotIndex = lp:GetAttribute("Slot")
-				if not slotIndex or not plrData.Slots[slotIndex] then task.wait(1) continue end
-				local weapon = plrData.Slots[slotIndex].Weapon
-				local upgrades = plrData.Slots[slotIndex].Upgrades[weapon]
+New("TextLabel",{Text="Misc",Font=Enum.Font.GothamBold,TextSize=22,
+    TextColor3=C.ACC2,BackgroundTransparency=1,
+    Size=UDim2.new(1,-20,0,30),Position=UDim2.new(0,16,0,10),
+    TextXAlignment=Enum.TextXAlignment.Left,Parent=MiscPage})
 
-				for upg, lvl in next, upgrades do
-					if getRemote:InvokeServer("S_Equipment", "Upgrade", upg) then
-						Library:Notify({
-							Title = "Upgraded " .. string.gsub(upg, "_", " "),
-							Description = "Level " .. tostring(lvl),
-							Time = 1.5
-						})
-						task.wait(0.3)
-					end
-				end
+-- Slot panel
+local SlotPanel=Panel(MiscPage,16,58,380,240)
+PanelHeader(SlotPanel,"🎰","SLOT")
+local getAutoSlotT,_=MakeToggle(SlotPanel,50,"Auto Select Slot",false)
+local getSlotDrop=MakeDropdown(SlotPanel,82,"Select Slot",{"Slot A","Slot B","Slot C"},"Slot A")
+local getAutoPrestigeT,_=MakeToggle(SlotPanel,140,"Auto Prestige",false)
+local getBoostDrop=MakeDropdown(SlotPanel,172,"Select Boost",{"Luck Boost","EXP Boost","Gold Boost"},"Luck Boost")
+local getPrestigeGold=MakeSlider(SlotPanel,228,"Prestige Gold (M)",0,100,0)
 
-				task.wait(0.5)
-			end
-		end)
-	end
-end)
+-- Family Roll panel
+local FamPanel=Panel(MiscPage,410,58,374,240)
+PanelHeader(FamPanel,"🎲","FAMILY ROLL")
+local getAutoRollT,_=MakeToggle(FamPanel,50,"Auto Roll",false)
+local getFamilyInput=MakeInput(FamPanel,82,"Select Families","Fritz,Yeager,etc.")
+local getFamilyRarity=MakeDropdown(FamPanel,140,"Stop At (Rarity)",{"Rare","Epic","Legendary","Mythical"},"Legendary")
+MakeLabel(FamPanel,196,"Mythical families won't be rolled\nSeparate with commas, no spaces.")
 
-UpgradesGroup:AddToggle("AutoEnhanceToggle", {
-	Text = "Enhance Perks",
-	Default = false,
+-- ============================================================
+--  PAGE: SETTINGS TAB
+-- ============================================================
+local SettPage=New("Frame",{
+    Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,
+    Visible=false,Parent=Content,
 })
-UpgradesGroup:AddLabel("Feeds lower-rarity perks into your equipped perk.", true)
-Toggles.AutoEnhanceToggle:OnChanged(function()
-	getgenv().AutoPerk = Toggles.AutoEnhanceToggle.Value
-	if getgenv().AutoPerk then
-		if game.PlaceId ~= 14916516914 then return end
-		task.spawn(function()
-			local plrData = GetPlayerData()
-			if not plrData or not plrData.Slots then return end
-			local slotIndex = lp:GetAttribute("Slot")
-			if not slotIndex or not plrData.Slots[slotIndex] then
-				getgenv().AutoPerk = false
-				Toggles.AutoEnhanceToggle:SetValue(false)
-				return
-			end
+PageFrames["Settings"]=SettPage
 
-			local slot = plrData.Slots[slotIndex]
-			local storagePerks = {}
-			for id, val in pairs(slot.Perks.Storage) do storagePerks[id] = val end
+New("TextLabel",{Text="Settings",Font=Enum.Font.GothamBold,TextSize=22,
+    TextColor3=C.ACC2,BackgroundTransparency=1,
+    Size=UDim2.new(1,-20,0,30),Position=UDim2.new(0,16,0,10),
+    TextXAlignment=Enum.TextXAlignment.Left,Parent=SettPage})
 
-			local perkSlot = Options.PerkSlotDropdown.Value
-			local equippedPerkId = slot.Perks.Equipped[perkSlot]
-			if not equippedPerkId then
-				Library:Notify({ Title = "Auto Perk", Description = "No perk equipped in " .. tostring(perkSlot) .. " slot.", Time = 3 })
-				getgenv().AutoPerk = false
-				Toggles.AutoEnhanceToggle:SetValue(false)
-				return
-			end
+local SettPanel=Panel(SettPage,16,58,380,220)
+PanelHeader(SettPanel,"⚙","SETTINGS")
+local getAutoHideT,_=MakeToggle(SettPanel,50,"Auto Hide GUI",false)
+local getDis3DT,_=MakeToggle(SettPanel,82,"Disable 3D Rendering (FPS Boost)",false)
+MakeLabel(SettPanel,120,"Menu toggle: Right Control (default)",C.DIM)
 
-			local perkData = storagePerks[equippedPerkId]
-			if not perkData then
-				Library:Notify({ Title = "Auto Perk", Description = "Equipped perk data not found.", Time = 3 })
-				getgenv().AutoPerk = false
-				Toggles.AutoEnhanceToggle:SetValue(false)
-				return
-			end
+local WebPanel=Panel(SettPage,410,58,374,220)
+PanelHeader(WebPanel,"🔗","WEBHOOK")
+local getRewardWHT,_=MakeToggle(WebPanel,50,"Reward Webhook",false)
+local getMythWHT,_=MakeToggle(WebPanel,82,"Mythical Family Webhook",false)
+local getWebhookURL=MakeInput(WebPanel,114,"Webhook URL","https://discord.com/api/webhooks/...")
 
-			local perkName = perkData.Name
-			local rarity = GetPerkRarity(perkName)
-			local currentLevel = perkData.Level or 0
-			local currentXP = perkData.XP or 0
+-- ============================================================
+--  WIRE UP LOGIC — mirror the original Obsidian toggles
+-- ============================================================
 
-			while getgenv().AutoPerk do
-				if currentLevel >= 10 then
-					Library:Notify({ Title = "Auto Perk", Description = perkName .. " is already Level 10!", Time = 3 })
-					break
-				end
+-- UpdateStatus already set above
 
-				local selectedRarities = Options.SelectPerksDropdown.Value
-				local rarityPerks = {}
-				if selectedRarities then
-					for r, isActive in pairs(selectedRarities) do
-						if isActive then rarityPerks[r] = true end
-					end
-				end
-
-				local validPerks = {}
-				local totalXPGain = 0
-
-				for perkId, tbl in pairs(storagePerks) do
-					local r = GetPerkRarity(tbl.Name)
-					if perkId ~= equippedPerkId and rarityPerks[r] then
-						table.insert(validPerks, perkId)
-						totalXPGain = totalXPGain + GetPerkXP(r, math.max(tbl.Level or 0, 1))
-						if #validPerks >= 5 then break end
-					end
-				end
-
-				if #validPerks == 0 then
-					Library:Notify({ Title = "Auto Perk", Description = "No more food perks found.", Time = 3 })
-					break
-				end
-
-				if getRemote:InvokeServer("S_Equipment", "Enhance", equippedPerkId, validPerks) then
-					for _, id in ipairs(validPerks) do storagePerks[id] = nil end
-
-					currentXP = currentXP + totalXPGain
-
-					while currentLevel < 10 do
-						local thresholds = Perk_Level_XP[rarity]
-						if not thresholds then break end
-						local needed = thresholds[currentLevel + 1]
-						if not needed or currentXP < needed then break end
-						currentXP = currentXP - needed
-						currentLevel = currentLevel + 1
-					end
-
-					Library:Notify({
-						Title = "Enhanced: " .. perkName,
-						Description = "Level " .. tostring(currentLevel) .. " (+" .. totalXPGain .. " XP)",
-						Time = 1
-					})
-				else
-					continue
-				end
-
-				task.wait(0.5)
-			end
-
-			getgenv().AutoPerk = false
-			Toggles.AutoEnhanceToggle:SetValue(false)
-		end)
-	end
-end)
-
-UpgradesGroup:AddDropdown("PerkSlotDropdown", {
-	Values = {"Defense", "Support", "Family", "Extra", "Offense", "Body"},
-	Default = 6,
-	Multi = false,
-	Text = "Perk Slot",
-})
-UpgradesGroup:AddLabel("The equipped perk slot to enhance. Default: Body.", true)
-
-UpgradesGroup:AddDropdown("SelectPerksDropdown", {
-	Values = {"Common", "Rare", "Epic", "Legendary"},
-	Default = {},
-	Multi = true,
-	Text = "Perks to use as Food",
-})
-UpgradesGroup:AddLabel("Rarities of perks to sacrifice as enhancement food.", true)
-
--- ==========================================
--- LOBBY › AUTOMATION TAB : Skill Tree Groupbox
--- ==========================================
-
-SkillTreeGroup:AddToggle("AutoSkillTree", {
-	Text = "Auto Skill Tree",
-	Default = false,
-})
-SkillTreeGroup:AddLabel("Automatically unlocks skill tree nodes in priority order.", true)
-Toggles.AutoSkillTree:OnChanged(function()
-	getgenv().AutoSkillTree = Toggles.AutoSkillTree.Value
-	local plrData = GetPlayerData()
-
-	if getgenv().AutoSkillTree then
-		if game.PlaceId ~= 14916516914 then return end
-		if not plrData or not plrData.Slots then return end
-		task.spawn(function()
-			while getgenv().AutoSkillTree do
-				local slotIndex = lp:GetAttribute("Slot")
-				if not slotIndex or not plrData.Slots[slotIndex] then task.wait(1) continue end
-				local weapon = plrData.Slots[slotIndex].Weapon
-
-				local middle = Options.MiddlePathDropdown.Value
-				local left = Options.LeftPathDropdown.Value
-				local right = Options.RightPathDropdown.Value
-
-				local middlePath = SkillPaths[weapon] and SkillPaths[weapon][middle]
-				local leftPath = SkillPaths.Support[left]
-				local rightPath = SkillPaths.Defense[right]
-
-				local p1 = Options.Priority1Dropdown.Value or "Middle"
-				local p2 = Options.Priority2Dropdown.Value or "Left"
-				local p3 = Options.Priority3Dropdown.Value or "None"
-
-				local pathMap = { Left = leftPath, Middle = middlePath, Right = rightPath }
-				local paths = {}
-				local used = {}
-
-				local function addPath(p)
-					if not used[p] and pathMap[p] then
-						table.insert(paths, pathMap[p])
-						used[p] = true
-					end
-				end
-
-				addPath(p1)
-				addPath(p2)
-				addPath(p3)
-
-				for _, path in ipairs(paths) do
-					if path then
-						for _, skillId in ipairs(path) do
-							if table.find(plrData.Slots[slotIndex].Skills.Unlocked, skillId) then continue end
-							local success = getRemote:InvokeServer("S_Equipment", "Unlock", {skillId})
-							if success then
-								Library:Notify({
-									Title = "Unlocked Skill",
-									Description = "ID: " .. skillId,
-									Time = 1
-								})
-							end
-						end
-					end
-				end
-				task.wait()
-			end
-		end)
-	end
-end)
-
-SkillTreeGroup:AddDropdown("MiddlePathDropdown", {
-	Values = {"Damage", "Critical"},
-	Default = 2,
-	Multi = false,
-	Text = "Middle Path",
-})
-SkillTreeGroup:AddLabel("Weapon-specific offensive skill path.", true)
-
-SkillTreeGroup:AddDropdown("LeftPathDropdown", {
-	Values = {"Regen", "Cooldown Reduction"},
-	Default = 2,
-	Multi = false,
-	Text = "Left Path",
-})
-SkillTreeGroup:AddLabel("Support path for sustain or cooldowns.", true)
-
-SkillTreeGroup:AddDropdown("RightPathDropdown", {
-	Values = {"Health", "Damage Reduction"},
-	Default = 2,
-	Multi = false,
-	Text = "Right Path",
-})
-SkillTreeGroup:AddLabel("Defense path for survivability.", true)
-
-SkillTreeGroup:AddDropdown("Priority1Dropdown", {
-	Values = {"Left", "Middle", "Right", "None"},
-	Default = 2,
-	Multi = false,
-	Text = "Priority 1",
-})
-SkillTreeGroup:AddLabel("First path to unlock skills in.", true)
-
-SkillTreeGroup:AddDropdown("Priority2Dropdown", {
-	Values = {"Left", "Middle", "Right", "None"},
-	Default = 1,
-	Multi = false,
-	Text = "Priority 2",
-})
-SkillTreeGroup:AddLabel("Second path once Priority 1 is complete.", true)
-
-SkillTreeGroup:AddDropdown("Priority3Dropdown", {
-	Values = {"Left", "Middle", "Right", "None"},
-	Default = 4,
-	Multi = false,
-	Text = "Priority 3",
-})
-SkillTreeGroup:AddLabel("Final path, or set to None to skip.", true)
-
--- ==========================================
--- LOBBY › SETTINGS TAB : Slot Groupbox
--- ==========================================
-
-SlotGroup:AddToggle("AutoSelectSlot", {
-	Text = "Auto Select Slot",
-	Default = false,
-})
-SlotGroup:AddLabel("Automatically selects and loads your chosen slot.", true)
-Toggles.AutoSelectSlot:OnChanged(function()
-	getgenv().AutoSlot = Toggles.AutoSelectSlot.Value
-	if getgenv().AutoSlot and not lp:GetAttribute("Slot") then
-		local selectedSlot = Options.SelectSlotDropdown.Value
-		local args = { "Functions", "Select", string.sub(selectedSlot, -1) }
-		task.spawn(function()
-			repeat
-				getRemote:InvokeServer(unpack(args))
-				task.wait(1)
-			until lp:GetAttribute("Slot") or not getgenv().AutoSlot
-
-			getRemote:InvokeServer("Functions", "Teleport", "Lobby")
-		end)
-	end
-end)
-
-SlotGroup:AddDropdown("SelectSlotDropdown", {
-	Values = {"Slot A", "Slot B", "Slot C"},
-	Default = 1,
-	Multi = false,
-	Text = "Select Slot",
-})
-SlotGroup:AddLabel("The save slot to auto-select on join.", true)
-
-SlotGroup:AddToggle("AutoPrestigeToggle", {
-	Text = "Auto Prestige",
-	Default = false,
-})
-SlotGroup:AddLabel("Automatically Prestiges after you hit the Lvl Max.", true)
-Toggles.AutoPrestigeToggle:OnChanged(function()
-	getgenv().AutoPrestige = Toggles.AutoPrestigeToggle.Value
-	if getgenv().AutoPrestige then
-		if game.PlaceId ~= 14916516914 then return end
-		task.spawn(function()
-			local pData = GetPlayerData()
-			if not pData or not pData.Slots then return end
-			local slotIdx = lp:GetAttribute("Slot")
-			if not slotIdx or not pData.Slots[slotIdx] then return end
-			local gold = pData.Slots[slotIdx].Currency.Gold
-			local requiredGold = Options.PrestigeGoldSlider.Value * 1000000
-
-			if gold < requiredGold then return end
-
-			while getgenv().AutoPrestige do
-				for _, Memory in ipairs(Talents) do
-					if not getgenv().AutoPrestige then break end
-					local success = getRemote:InvokeServer("S_Equipment", "Prestige", {Boosts = Options.SelectBoostDropdown.Value, Talents = Memory})
-					if success then
-						Library:Notify({
-							Title = "Successfully Prestiged",
-							Description = "Prestiged with " .. Options.SelectBoostDropdown.Value .. " and " .. Memory,
-							Time = 5
-						})
-						break
-					end
-					task.wait(0.1)
-				end
-				task.wait(1)
-			end
-		end)
-	end
-end)
-
-SlotGroup:AddDropdown("SelectBoostDropdown", {
-	Values = {"Luck Boost", "EXP Boost", "Gold Boost"},
-	Default = 1,
-	Multi = false,
-	Text = "Prestige Boost",
-})
-SlotGroup:AddLabel("The boost you want to apply when prestiging.", true)
-
-SlotGroup:AddSlider("PrestigeGoldSlider", {
-	Text = "Prestige Gold (in millions)",
-	Default = 0,
-	Min = 0,
-	Max = 100,
-	Rounding = 0,
-})
-SlotGroup:AddLabel("Minimum Gold required before Auto Prestige fires.", true)
-
--- ==========================================
--- LOBBY › SETTINGS TAB : Family Roll Groupbox
--- ==========================================
-
-FamilyRollGroup:AddToggle("AutoRollToggle", {
-	Text = "Auto Roll",
-	Default = false,
-})
-FamilyRollGroup:AddLabel("Rolls for families until a target or rarity is hit.", true)
-Toggles.AutoRollToggle:OnChanged(function()
-	getgenv().AutoRoll = Toggles.AutoRollToggle.Value
-	if getgenv().AutoRoll then
-		if game.PlaceId ~= 13379208636 then
-			Library:Notify({
-				Title = "Tekkit Hub",
-				Description = "You must be in the lobby to use family roll features.",
-				Time = 3
-			})
-			return
-		end
-		task.spawn(function()
-			while getgenv().AutoRoll do
-				local targets, rarities
-
-				local text = Options.SelectFamily.Value
-				if text and text ~= "" then
-					text = string.lower(text)
-					targets = string.split(text, ",")
-				end
-
-				local raritySelected = Options.SelectFamilyRarity.Value
-				if raritySelected then
-					rarities = {}
-					for rarityName, isEnabled in pairs(raritySelected) do
-						if isEnabled then
-							table.insert(rarities, string.lower(rarityName))
-						end
-					end
-				end
-				
-				roll(targets, rarities)
-				task.wait(0.25)
-			end
-		end)
-	end
-end)
-
-FamilyRollGroup:AddInput("SelectFamily", {
-	Default = "",
-	Text = "Target Families",
-	Placeholder = "Fritz,Yeager,etc.",
-})
-FamilyRollGroup:AddLabel("Stop rolling when one of these families is hit.", true)
-Options.SelectFamily:OnChanged(function()
-	if Options.SelectFamily.Value ~= "" then
-		Library:Notify({
-			Title = "Tekkit Hub",
-			Description = "Families selected: " .. Options.SelectFamily.Value,
-			Time = 2
-		})
-	end
-end)
-
-FamilyRollGroup:AddDropdown("SelectFamilyRarity", {
-	Values = familyRaritiesOptions,
-	Default = {},
-	Multi = true,
-	Text = "Stop At Rarity",
-})
-FamilyRollGroup:AddLabel("Stops rolling when this rarity or higher is obtained. Mythicals are never rolled. Separate families with commas, no spaces.", true)
-
--- ==========================================
--- IN-GAME SETTINGS TAB : Settings & Webhook Groupboxes
--- ==========================================
-
-WebhookGroup:AddToggle("ToggleRewardWebhook", {
-	Text = "Reward Webhook",
-	Default = false,
-})
-WebhookGroup:AddLabel("Sends a Discord webhook when rewards are received.", true)
-Toggles.ToggleRewardWebhook:OnChanged(function()
-	getgenv().RewardWebhook = Toggles.ToggleRewardWebhook.Value
-end)
-
-WebhookGroup:AddToggle("ToggleMythicalFamilyWebhook", {
-	Text = "Mythical Family Webhook",
-	Default = false,
-})
-WebhookGroup:AddLabel("Sends a webhook when a Mythical family is rolled.", true)
-Toggles.ToggleMythicalFamilyWebhook:OnChanged(function()
-	getgenv().MythicalFamilyWebhook = Toggles.ToggleMythicalFamilyWebhook.Value
-end)
-
-WebhookGroup:AddInput("WebhookUrl", {
-	Default = "",
-	Text = "Webhook URL",
-	Placeholder = "https://discord.com/api/webhooks/...",
-})
-WebhookGroup:AddLabel("Your Discord webhook URL for notifications.", true)
-Options.WebhookUrl:OnChanged(function()
-	webhook = Options.WebhookUrl.Value
-end)
-
-SettingsGroup:AddToggle("AutoHideToggle", {
-	Text = "Auto Hide GUI",
-	Default = false,
-})
-SettingsGroup:AddLabel("Hides the GUI automatically after loading.", true)
-
-SettingsGroup:AddToggle("Disable3DRendering", {
-	Text = "Disable 3D Rendering (FPS Boost)",
-	Default = false,
-})
-SettingsGroup:AddLabel("Stops 3D scene rendering for a significant FPS boost.", true)
-Toggles.Disable3DRendering:OnChanged(function()
-	RunService:Set3dRenderingEnabled(not Toggles.Disable3DRendering.Value)
-end)
-
-SettingsGroup:AddLabel("Menu toggle"):AddKeyPicker("MenuKeybind", { Default = "RightControl", NoUI = true, Text = "Menu keybind" })
-Library.ToggleKeybind = Options.MenuKeybind
-
-ThemeManager:SetLibrary(Library)
-SaveManager:SetLibrary(Library)
-
-ThemeManager:SetFolder("UsSuite/aotr")
-SaveManager:SetFolder("UsSuite/aotr")
-
--- Use In-Game Settings tab for config & theme (replaces old Tabs.Settings)
-SaveManager:BuildConfigSection(Tabs.InGame_Settings)
-ThemeManager:ApplyToTab(Tabs.InGame_Settings)
-
-ThemeManager:ApplyTheme("Dark")
-SaveManager:LoadAutoloadConfig()
-
-Library:OnUnload(function()
-	Library.Unloaded = true
-end)
-
+-- 3D rendering toggle
+local RS=game:GetService("RunService")
 task.spawn(function()
-	while not Library.Unloaded do
-		local success, err = pcall(ExecuteImmediateAutomation)
-		task.wait(0.5)
-	end
+    while true do
+        task.wait(0.5)
+        if getDis3DT then
+            RS:Set3dRenderingEnabled(not getDis3DT())
+        end
+    end
+end)
+
+-- Auto Hide
+task.defer(function()
+    task.wait(0.5)
+    if getAutoHideT and getAutoHideT() then
+        Win.Visible=false
+        LogWrite("Auto Hide: GUI hidden. Press RightControl to show.","dim")
+    end
+end)
+
+-- Toggle visibility with RightControl
+UserInputService.InputBegan:Connect(function(inp,gp)
+    if not gp and inp.KeyCode==Enum.KeyCode.RightControl then
+        Win.Visible=not Win.Visible
+    end
 end)
 
 -- Anti-AFK
-local virtualUser = game:GetService("VirtualUser")
+local VU=game:GetService("VirtualUser")
 lp.Idled:Connect(function()
-	virtualUser:CaptureController()
-	virtualUser:ClickButton2(Vector2.new())
+    VU:CaptureController()
+    VU:ClickButton2(Vector2.new())
 end)
 
--- Auto Hide Logic
+-- Auto Farm loop bridge
 task.spawn(function()
-	task.wait(0.5) -- Wait for config load
-	if getgenv().DeleteMap then DeleteMap() end
-	if Toggles.AutoHideToggle.Value then
-		Library:Toggle(false)
-		Library:Notify({
-			Title = "Tekkit Hub",
-			Description = "GUI auto-hidden. Press RightControl to show.",
-			Time = 2
-		})
-	end
+    while true do
+        task.wait(0.5)
+        if getAutoFarm and getAutoFarm() then
+            if AutoFarm and not AutoFarm._running then AutoFarm:Start() end
+        else
+            if AutoFarm and AutoFarm._running then AutoFarm:Stop() end
+        end
+        if getAutoChestT and getAutoChestT() then
+            getgenv().AutoChest=true
+        else
+            getgenv().AutoChest=false
+        end
+        if getAutoRetryT and getAutoRetryT() then
+            getgenv().AutoRetry=true
+        else
+            getgenv().AutoRetry=false
+        end
+    end
 end)
+
+-- Character speed/jump live update
+RunService.Heartbeat:Connect(function()
+    local char=lp.Character
+    if not char then return end
+    local h=char:FindFirstChildOfClass("Humanoid")
+    if not h then return end
+    if getNoClip and getNoClip() then
+        for _,p in ipairs(char:GetDescendants()) do
+            if p:IsA("BasePart") then p.CanCollide=false end
+        end
+    end
+    if getInfStam then
+        -- Stamina attribute set to max if available
+        if char:GetAttribute("Stamina") then
+            char:SetAttribute("Stamina",char:GetAttribute("MaxStamina") or 100)
+        end
+    end
+end)
+
+-- Family Roll loop
+task.spawn(function()
+    while true do
+        task.wait(0.25)
+        if getAutoRollT and getAutoRollT() then
+            getgenv().AutoRoll=true
+        else
+            getgenv().AutoRoll=false
+        end
+    end
+end)
+
+-- Webhook URL sync
+task.spawn(function()
+    while true do
+        task.wait(1)
+        if getWebhookURL then
+            webhook=getWebhookURL()
+        end
+    end
+end)
+
+LogWrite("All systems ready.","green")
+
+-- ── END TITANIC HUB ─────────────────────────────────────────
