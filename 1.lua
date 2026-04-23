@@ -604,33 +604,42 @@ end
 local TSQuest = {}
 TSQuest._running = false
 
--- Helper: find Supplies_Circle BasePart anywhere in workspace
-local function getSuppliesCircle()
-	-- Check Unclimbable first (most likely), then workspace root
-	local function searchIn(parent)
+-- Returns position of Supplies_Circle (searches Unclimbable + workspace root)
+local function getCirclePos()
+	local function tryGet(parent)
 		if not parent then return nil end
 		local sc = parent:FindFirstChild("Supplies_Circle")
-		if sc then
-			-- Return the first BasePart inside, or sc itself if it is one
-			if sc:IsA("BasePart") then return sc end
+		if not sc then return nil end
+		-- BasePart directly
+		if sc:IsA("BasePart") then return sc.Position end
+		-- Model with PrimaryPart
+		if sc:IsA("Model") then
+			if sc.PrimaryPart then return sc.PrimaryPart.Position end
+			-- Any descendant BasePart
 			for _, d in ipairs(sc:GetDescendants()) do
-				if d:IsA("BasePart") then return d end
+				if d:IsA("BasePart") then return d.Position end
 			end
+			-- Fallback: GetPivot
+			local ok, pos = pcall(function() return sc:GetPivot().Position end)
+			if ok then return pos end
 		end
 		return nil
 	end
-	return searchIn(workspace:FindFirstChild("Unclimbable"))
-		or searchIn(workspace:FindFirstChild("Climbable"))
-		or searchIn(workspace)
+
+	return tryGet(workspace:FindFirstChild("Unclimbable"))
+		or tryGet(workspace:FindFirstChild("Climbable"))
+		or tryGet(workspace)
 end
 
--- Helper: teleport HRP to a position and hold for `duration` seconds
-local function holdAt(hrp, pos, duration)
-	local t0 = os.clock()
+-- Teleport HRP to pos+offset and hold for `secs` seconds
+local function stayAt(hrp, pos, secs)
+	if not pos then return end
 	local dest = CFrame.new(pos + Vector3.new(0, 3, 0))
-	while (os.clock() - t0) < duration do
+	local t0 = os.clock()
+	while (os.clock() - t0) < secs do
+		if not hrp or not hrp.Parent then break end
 		hrp.CFrame = dest
-		hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+		hrp.AssemblyLinearVelocity = Vector3.zero
 		task.wait(0.1)
 	end
 end
@@ -641,26 +650,27 @@ function TSQuest:Start()
 	self._running = true
 
 	task.spawn(function()
-		UpdateStatus("TS Quest: Starting...")
+		UpdateStatus("TS Quest: Waiting for map...")
+
+		-- Wait until Unclimbable exists
+		while self._running and not workspace:FindFirstChild("Unclimbable") do
+			task.wait(1)
+		end
 
 		while self._running do
 			local char = lp.Character
 			local hrp  = char and char:FindFirstChild("HumanoidRootPart")
-			if not hrp then task.wait(0.5); continue end
+			if not hrp then task.wait(0.3); continue end
 
-			-- Keep collisions off so we never get stuck
+			-- No collisions so we don't get stuck in walls/trees
 			for _, p in ipairs(char:GetDescendants()) do
 				if p:IsA("BasePart") then p.CanCollide = false end
 			end
 
 			local unclimbable = workspace:FindFirstChild("Unclimbable")
-			if not unclimbable then
-				UpdateStatus("TS Quest: Waiting for map...")
-				task.wait(1)
-				continue
-			end
+			if not unclimbable then task.wait(1); continue end
 
-			-- Gather pending supplies (only ones still in workspace)
+			-- Find all remaining supplies
 			local supplies = {}
 			for _, v in ipairs(unclimbable:GetChildren()) do
 				if v.Name:match("^ThunderSpear_Supplies%d+$") and v.Parent then
@@ -669,86 +679,82 @@ function TSQuest:Start()
 			end
 
 			if #supplies == 0 then
-				UpdateStatus("TS Quest: Waiting for supplies to spawn...")
+				UpdateStatus("TS Quest: No supplies yet, waiting...")
 				task.wait(1)
 				continue
 			end
 
 			-- Sort 1 → 2 → 3
 			table.sort(supplies, function(a, b)
-				local na = tonumber(a.Name:match("%d+$")) or 0
-				local nb = tonumber(b.Name:match("%d+$")) or 0
-				return na < nb
+				return (tonumber(a.Name:match("%d+$")) or 0) < (tonumber(b.Name:match("%d+$")) or 0)
 			end)
-
-			-- Find Supplies_Circle once per cycle
-			local circleRef = getSuppliesCircle()
 
 			for _, supply in ipairs(supplies) do
 				if not self._running then break end
-				if not supply.Parent then continue end -- already collected
+				if not supply.Parent then continue end -- already gone
 
-				-- ── Step A: Go to the crate ──
-				local hitbox  = supply:FindFirstChild("Hitbox")
-				local crate   = supply:FindFirstChild("CrateBox")
-				local target  = hitbox or crate
+				-- Pick best interaction target (Hitbox > CrateBox > any BasePart)
+				local target = supply:FindFirstChild("Hitbox")
+					or supply:FindFirstChild("CrateBox")
+				if not target then
+					for _, d in ipairs(supply:GetDescendants()) do
+						if d:IsA("BasePart") then target = d; break end
+					end
+				end
 				if not target then continue end
 
-				UpdateStatus("TS Quest: Picking up " .. supply.Name .. "...")
-
+				-- ── STEP 1: Go to supply ──
+				UpdateStatus("TS Quest: Going to " .. supply.Name)
 				local cratePos = target.Position
 				local t0 = os.clock()
-				while self._running and supply.Parent and (os.clock() - t0) < 8 do
+				while self._running and supply.Parent and (os.clock() - t0) < 10 do
 					hrp.CFrame = CFrame.new(cratePos + Vector3.new(0, 3, 0))
-					hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+					hrp.AssemblyLinearVelocity = Vector3.zero
 					pcall(function() postRemote:FireServer("Objectives", "Interact", target) end)
 					pcall(function() postRemote:FireServer("Supply", "Collect", supply) end)
-					task.wait(0.12)
+					task.wait(0.1)
 				end
 
-				-- ── Step B: After picking up → go to Supplies_Circle ──
+				-- ── STEP 2: Immediately go to Supplies_Circle ──
 				if not self._running then break end
-
-				-- Refresh circle reference in case it spawned late
-				if not circleRef or not circleRef.Parent then
-					circleRef = getSuppliesCircle()
-				end
-
-				if circleRef and circleRef.Parent then
-					UpdateStatus("TS Quest: Going to Supplies_Circle...")
-					holdAt(hrp, circleRef.Position, 2.5)
+				local circlePos = getCirclePos()
+				if circlePos then
+					UpdateStatus("TS Quest: → Supplies_Circle")
+					stayAt(hrp, circlePos, 3)
 				else
-					UpdateStatus("TS Quest: Supplies_Circle not found, waiting...")
+					-- Circle not found: print to console for debug, wait briefly
+					warn("[TSQuest] Supplies_Circle not found! Check workspace structure.")
+					UpdateStatus("TS Quest: Circle missing, skipping...")
 					task.wait(1)
 				end
 			end
 
-			-- ── Step C: After ALL crates done → stand on Points ──
+			-- ── STEP 3: After all supplies → stand on Points ──
+			if not self._running then break end
 			local pointsFolder = nil
 			for _, v in ipairs(unclimbable:GetChildren()) do
 				if v.Name:match("^ThunderSpear_Supplies") then
-					local pts = v:FindFirstChild("Points")
-					if pts then pointsFolder = pts; break end
+					pointsFolder = v:FindFirstChild("Points")
+					if pointsFolder then break end
 				end
 			end
 
 			if pointsFolder then
 				UpdateStatus("TS Quest: Standing on Points...")
-				local pointParts = {}
+				local pts = {}
 				for _, p in ipairs(pointsFolder:GetDescendants()) do
-					if p:IsA("BasePart") then table.insert(pointParts, p) end
+					if p:IsA("BasePart") then table.insert(pts, p) end
 				end
-				if #pointParts == 0 and pointsFolder:IsA("BasePart") then
-					table.insert(pointParts, pointsFolder)
+				if #pts == 0 and pointsFolder:IsA("BasePart") then
+					table.insert(pts, pointsFolder)
 				end
-
-				for _, pt in ipairs(pointParts) do
+				for _, pt in ipairs(pts) do
 					if not self._running then break end
-					holdAt(hrp, pt.Position, 4)
+					stayAt(hrp, pt.Position, 5)
 				end
 			end
 
-			UpdateStatus("TS Quest: Cycle done, looping...")
+			UpdateStatus("TS Quest: Cycle done, restarting...")
 			task.wait(0.5)
 		end
 
