@@ -1472,10 +1472,11 @@ function Library:CreateWindow(opts)
                     it.MouseEnter:Connect(function() if not sel then tw(it,{BackgroundColor3=C.DROP_HOVER},0.07) end end)
                     it.MouseLeave:Connect(function() if not sel then tw(it,{BackgroundColor3=C.DROP_ITEM},0.07) end end)
                     it.MouseButton1Click:Connect(function()
-                if multi then cur[v]=not cur[v] else cur=v end
-                obj.Value=cur dlbl.Text=dispTxt()
-                for _,cb in ipairs(cbs) do pcall(cb,cur) end
-                rebuild() if not multi then lf.Visible=false open2=false end
+                        if multi then cur[v]=not cur[v] else cur=v end
+                        obj.Value=cur dlbl.Text=dispTxt()
+                        for _,cb in ipairs(cbs) do pcall(cb,cur) end
+                        rebuild()
+                        if not multi then lf.Visible=false end
                     end)
                 end
             end
@@ -1595,7 +1596,7 @@ function Library:CreateWindow(opts)
 
     function Win:AddTab(name,_) return self:_makeTab(name) end
     return Win
-end
+end -- end CreateWindow
 
 -- ThemeManager & SaveManager stubs
 local TM={} function TM:SetLibrary(_) end function TM:SetFolder(_) end function TM:ApplyTheme(_) end function TM:ApplyToTab(_) end
