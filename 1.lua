@@ -610,37 +610,55 @@ local function getCirclePos()
 		if not parent then return nil end
 		local sc = parent:FindFirstChild("Supplies_Circle")
 		if not sc then return nil end
-		-- BasePart directly
 		if sc:IsA("BasePart") then return sc.Position end
-		-- Model with PrimaryPart
 		if sc:IsA("Model") then
 			if sc.PrimaryPart then return sc.PrimaryPart.Position end
-			-- Any descendant BasePart
 			for _, d in ipairs(sc:GetDescendants()) do
 				if d:IsA("BasePart") then return d.Position end
 			end
-			-- Fallback: GetPivot
 			local ok, pos = pcall(function() return sc:GetPivot().Position end)
 			if ok then return pos end
 		end
 		return nil
 	end
-
 	return tryGet(workspace:FindFirstChild("Unclimbable"))
 		or tryGet(workspace:FindFirstChild("Climbable"))
 		or tryGet(workspace)
 end
 
--- Teleport HRP to pos+offset and hold for `secs` seconds
-local function stayAt(hrp, pos, secs)
-	if not pos then return end
-	local dest = CFrame.new(pos + Vector3.new(0, 3, 0))
-	local t0 = os.clock()
-	while (os.clock() - t0) < secs do
-		if not hrp or not hrp.Parent then break end
-		hrp.CFrame = dest
+-- Hover smoothly towards `targetPos` until within `arriveRadius` studs,
+-- then hold there for `holdSecs` seconds.
+-- Uses AutoFarmConfig.MoveSpeed so it matches the farm speed setting.
+local function hoverTo(hrp, targetPos, holdSecs, arriveRadius)
+	if not targetPos or not hrp or not hrp.Parent then return end
+	arriveRadius = arriveRadius or 5
+	holdSecs     = holdSecs or 2
+	local dest = targetPos + Vector3.new(0, 3, 0)
+
+	-- Phase 1: Move towards target
+	while hrp and hrp.Parent do
+		local dir = dest - hrp.Position
+		local dist = dir.Magnitude
+		if dist <= arriveRadius then break end
+		hrp.AssemblyLinearVelocity = dir.Unit * getgenv().AutoFarmConfig.MoveSpeed
+		task.wait(0.05)
+	end
+
+	-- Phase 2: Hold at destination
+	if hrp and hrp.Parent then
 		hrp.AssemblyLinearVelocity = Vector3.zero
-		task.wait(0.1)
+		local t0 = os.clock()
+		while hrp and hrp.Parent and (os.clock() - t0) < holdSecs do
+			local drift = (dest - hrp.Position)
+			if drift.Magnitude > arriveRadius then
+				-- Drifted away, nudge back
+				hrp.AssemblyLinearVelocity = drift.Unit * (getgenv().AutoFarmConfig.MoveSpeed * 0.4)
+			else
+				hrp.AssemblyLinearVelocity = Vector3.zero
+			end
+			task.wait(0.05)
+		end
+		hrp.AssemblyLinearVelocity = Vector3.zero
 	end
 end
 
@@ -706,23 +724,32 @@ function TSQuest:Start()
 				-- ── STEP 1: Go to supply ──
 				UpdateStatus("TS Quest: Going to " .. supply.Name)
 				local cratePos = target.Position
+
+				-- Hover towards crate first
+				hoverTo(hrp, cratePos, 0, 6)
+
+				-- Once near: stay on it until collected or timeout
 				local t0 = os.clock()
-				while self._running and supply.Parent and (os.clock() - t0) < 10 do
-					hrp.CFrame = CFrame.new(cratePos + Vector3.new(0, 3, 0))
-					hrp.AssemblyLinearVelocity = Vector3.zero
+				while self._running and supply.Parent and (os.clock() - t0) < 8 do
+					local drift = (cratePos + Vector3.new(0,3,0)) - hrp.Position
+					if drift.Magnitude > 4 then
+						hrp.AssemblyLinearVelocity = drift.Unit * (getgenv().AutoFarmConfig.MoveSpeed * 0.3)
+					else
+						hrp.AssemblyLinearVelocity = Vector3.zero
+					end
 					pcall(function() postRemote:FireServer("Objectives", "Interact", target) end)
 					pcall(function() postRemote:FireServer("Supply", "Collect", supply) end)
 					task.wait(0.1)
 				end
+				hrp.AssemblyLinearVelocity = Vector3.zero
 
 				-- ── STEP 2: Immediately go to Supplies_Circle ──
 				if not self._running then break end
 				local circlePos = getCirclePos()
 				if circlePos then
 					UpdateStatus("TS Quest: → Supplies_Circle")
-					stayAt(hrp, circlePos, 3)
+					hoverTo(hrp, circlePos, 3, 5)
 				else
-					-- Circle not found: print to console for debug, wait briefly
 					warn("[TSQuest] Supplies_Circle not found! Check workspace structure.")
 					UpdateStatus("TS Quest: Circle missing, skipping...")
 					task.wait(1)
@@ -750,7 +777,7 @@ function TSQuest:Start()
 				end
 				for _, pt in ipairs(pts) do
 					if not self._running then break end
-					stayAt(hrp, pt.Position, 5)
+					hoverTo(hrp, pt.Position, 5, 5)
 				end
 			end
 
