@@ -604,6 +604,37 @@ end
 local TSQuest = {}
 TSQuest._running = false
 
+-- Helper: find Supplies_Circle BasePart anywhere in workspace
+local function getSuppliesCircle()
+	-- Check Unclimbable first (most likely), then workspace root
+	local function searchIn(parent)
+		if not parent then return nil end
+		local sc = parent:FindFirstChild("Supplies_Circle")
+		if sc then
+			-- Return the first BasePart inside, or sc itself if it is one
+			if sc:IsA("BasePart") then return sc end
+			for _, d in ipairs(sc:GetDescendants()) do
+				if d:IsA("BasePart") then return d end
+			end
+		end
+		return nil
+	end
+	return searchIn(workspace:FindFirstChild("Unclimbable"))
+		or searchIn(workspace:FindFirstChild("Climbable"))
+		or searchIn(workspace)
+end
+
+-- Helper: teleport HRP to a position and hold for `duration` seconds
+local function holdAt(hrp, pos, duration)
+	local t0 = os.clock()
+	local dest = CFrame.new(pos + Vector3.new(0, 3, 0))
+	while (os.clock() - t0) < duration do
+		hrp.CFrame = dest
+		hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+		task.wait(0.1)
+	end
+end
+
 function TSQuest:Start()
 	if self._running then return end
 	if isLobby then return end
@@ -614,10 +645,10 @@ function TSQuest:Start()
 
 		while self._running do
 			local char = lp.Character
-			local hrp = char and char:FindFirstChild("HumanoidRootPart")
+			local hrp  = char and char:FindFirstChild("HumanoidRootPart")
 			if not hrp then task.wait(0.5); continue end
 
-			-- Disable collisions to avoid getting stuck
+			-- Keep collisions off so we never get stuck
 			for _, p in ipairs(char:GetDescendants()) do
 				if p:IsA("BasePart") then p.CanCollide = false end
 			end
@@ -629,10 +660,10 @@ function TSQuest:Start()
 				continue
 			end
 
-			-- Collect all ThunderSpear_Supplies models
+			-- Gather pending supplies (only ones still in workspace)
 			local supplies = {}
 			for _, v in ipairs(unclimbable:GetChildren()) do
-				if v.Name:match("^ThunderSpear_Supplies%d+$") then
+				if v.Name:match("^ThunderSpear_Supplies%d+$") and v.Parent then
 					table.insert(supplies, v)
 				end
 			end
@@ -643,47 +674,56 @@ function TSQuest:Start()
 				continue
 			end
 
-			-- Sort supplies 1 → 2 → 3
+			-- Sort 1 → 2 → 3
 			table.sort(supplies, function(a, b)
 				local na = tonumber(a.Name:match("%d+$")) or 0
 				local nb = tonumber(b.Name:match("%d+$")) or 0
 				return na < nb
 			end)
 
-			-- ─── Phase 1: Collect each crate ───
+			-- Find Supplies_Circle once per cycle
+			local circleRef = getSuppliesCircle()
+
 			for _, supply in ipairs(supplies) do
 				if not self._running then break end
-				if not supply or not supply.Parent then continue end
+				if not supply.Parent then continue end -- already collected
 
-				local hitbox = supply:FindFirstChild("Hitbox")
-				local crateBox = supply:FindFirstChild("CrateBox")
-				local target = hitbox or crateBox
+				-- ── Step A: Go to the crate ──
+				local hitbox  = supply:FindFirstChild("Hitbox")
+				local crate   = supply:FindFirstChild("CrateBox")
+				local target  = hitbox or crate
 				if not target then continue end
 
-				UpdateStatus("TS Quest: Collecting " .. supply.Name .. "...")
+				UpdateStatus("TS Quest: Picking up " .. supply.Name .. "...")
 
-				local targetPos = target.Position + Vector3.new(0, 3, 0)
-
-				-- Keep teleporting to the crate until it's gone (collected) or timeout
+				local cratePos = target.Position
 				local t0 = os.clock()
-				while self._running and supply.Parent and (os.clock() - t0) < 6 do
-					hrp.CFrame = CFrame.new(targetPos)
+				while self._running and supply.Parent and (os.clock() - t0) < 8 do
+					hrp.CFrame = CFrame.new(cratePos + Vector3.new(0, 3, 0))
 					hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
-					-- Try firing the interaction remote just in case game uses it
-					pcall(function()
-						postRemote:FireServer("Objectives", "Interact", target)
-					end)
-					pcall(function()
-						postRemote:FireServer("Supply", "Collect", supply)
-					end)
-					task.wait(0.15)
+					pcall(function() postRemote:FireServer("Objectives", "Interact", target) end)
+					pcall(function() postRemote:FireServer("Supply", "Collect", supply) end)
+					task.wait(0.12)
 				end
 
-				task.wait(0.2)
+				-- ── Step B: After picking up → go to Supplies_Circle ──
+				if not self._running then break end
+
+				-- Refresh circle reference in case it spawned late
+				if not circleRef or not circleRef.Parent then
+					circleRef = getSuppliesCircle()
+				end
+
+				if circleRef and circleRef.Parent then
+					UpdateStatus("TS Quest: Going to Supplies_Circle...")
+					holdAt(hrp, circleRef.Position, 2.5)
+				else
+					UpdateStatus("TS Quest: Supplies_Circle not found, waiting...")
+					task.wait(1)
+				end
 			end
 
-			-- ─── Phase 2: Go to Points ───
-			-- Points folder lives in the last supply model (ThunderSpear_Supplies3)
+			-- ── Step C: After ALL crates done → stand on Points ──
 			local pointsFolder = nil
 			for _, v in ipairs(unclimbable:GetChildren()) do
 				if v.Name:match("^ThunderSpear_Supplies") then
@@ -693,35 +733,23 @@ function TSQuest:Start()
 			end
 
 			if pointsFolder then
-				UpdateStatus("TS Quest: Moving to Points...")
-				-- Iterate every BasePart inside Points folder
+				UpdateStatus("TS Quest: Standing on Points...")
 				local pointParts = {}
 				for _, p in ipairs(pointsFolder:GetDescendants()) do
 					if p:IsA("BasePart") then table.insert(pointParts, p) end
 				end
-				if #pointParts == 0 then
-					-- pointsFolder itself might be a BasePart
-					if pointsFolder:IsA("BasePart") then
-						table.insert(pointParts, pointsFolder)
-					end
+				if #pointParts == 0 and pointsFolder:IsA("BasePart") then
+					table.insert(pointParts, pointsFolder)
 				end
 
 				for _, pt in ipairs(pointParts) do
 					if not self._running then break end
-					local t0 = os.clock()
-					while self._running and (os.clock() - t0) < 5 do
-						hrp.CFrame = CFrame.new(pt.Position + Vector3.new(0, 3, 0))
-						hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
-						task.wait(0.15)
-					end
+					holdAt(hrp, pt.Position, 4)
 				end
-			else
-				UpdateStatus("TS Quest: No Points found, holding position...")
-				task.wait(2)
 			end
 
-			UpdateStatus("TS Quest: Cycle complete, looping...")
-			task.wait(1)
+			UpdateStatus("TS Quest: Cycle done, looping...")
+			task.wait(0.5)
 		end
 
 		UpdateStatus("TS Quest: Stopped.")
