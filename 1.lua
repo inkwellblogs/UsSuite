@@ -960,7 +960,7 @@ local function setupAutoExecute()
 		queue_on_teleport([[
 			repeat task.wait() until game:IsLoaded()
 			task.wait(5)
-			loadstring(game:HttpGet("https://raw.githubusercontent.com/inkwellblogs/UsSuite/main/1.lua", true))()
+			loadstring(game:HttpGet("https://raw.githubusercontent.com/inkwellblogs/UsSuite/main/1.lua"))()
 		]])
 	end
 end
