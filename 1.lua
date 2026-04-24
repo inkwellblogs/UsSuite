@@ -1021,10 +1021,9 @@ local function roll(targets, rarities)
 
 	if stopRolling then
 		getgenv().AutoRoll = false
-		-- Toggles reference set after UI loads; guard with pcall
 		pcall(function()
-			if ToggleStates and ToggleStates.AutoRollToggle then
-				ToggleStates.AutoRollToggle:Set(false)
+			if AutoRollToggle then
+				AutoRollToggle:Set(false)
 			end
 		end)
 
@@ -1115,7 +1114,6 @@ local function handleWeaponReload()
 
 		local current = getBladeCount() or 0
 
-		-- 1. Refill Reserves (if empty)
 		if current == 0 and autoRefillEnabled then
 			local refillPart = workspace:FindFirstChild("Unclimbable")
 				and workspace.Unclimbable:FindFirstChild("Reloads")
@@ -1133,7 +1131,6 @@ local function handleWeaponReload()
 			end
 		end
 
-		-- 2. Equip Blade (if missing from hand and we have reserves)
 		if blade and blade.Transparency == 1 and current > 0 then
 			isReloading = true
 			lastReloadTime = os.clock()
@@ -1205,13 +1202,10 @@ local Window = Rayfield:CreateWindow({
    KeySystem = false,
 })
 
--- Store toggle states
-local ToggleStates = {}
-
 -- ==========================================
--- FARM TAB
+-- FARM TAB - Auto Farm, Movement, Combat
 -- ==========================================
-local FarmTab = Window:CreateTab("Farm", 4483362458)
+local FarmTab = Window:CreateTab("Farm", nil) -- First tab shows Farm
 
 local FarmSection = FarmTab:CreateSection("Auto Farm")
 
@@ -1220,7 +1214,6 @@ local AutoKillToggle = FarmTab:CreateToggle({
    CurrentValue = false,
    Flag = "AutoKillToggle",
    Callback = function(Value)
-      ToggleStates.AutoKillToggle = AutoKillToggle
       if Value then AutoFarm:Start() else AutoFarm:Stop() end
    end,
 })
@@ -1309,18 +1302,18 @@ local AutoEscapeToggle = FarmTab:CreateToggle({
 })
 
 -- ==========================================
--- TS QUEST TAB (Empty for future)
+-- TS QUEST TAB
 -- ==========================================
-local TSQuestTab = Window:CreateTab("TS Quest", 4483362458)
+local TSQuestTab = Window:CreateTab("TS Quest", nil)
 
 TSQuestTab:CreateSection("Coming Soon")
 
-local TSParagraph = TSQuestTab:CreateParagraph({Title = "TS Quest System", Content = "This tab is reserved for future TS Quest features. Stay tuned!"})
+TSQuestTab:CreateParagraph({Title = "TS Quest System", Content = "This tab is reserved for future TS Quest features. Stay tuned!"})
 
 -- ==========================================
--- AUTO START TAB
+-- AUTO START TAB - Mission/Raid Auto Start
 -- ==========================================
-local AutoStartTab = Window:CreateTab("Auto Start", 4483362458)
+local AutoStartTab = Window:CreateTab("Auto Start", nil)
 
 local StartSection = AutoStartTab:CreateSection("Mission/Raid Auto Start")
 
@@ -1574,7 +1567,7 @@ local RaidDifficultyDropdown = AutoStartTab:CreateDropdown({
    end,
 })
 
-local ModifiersParagraph = AutoStartTab:CreateParagraph({Title = "Raid Info", Content = "Trost: Attack Titan\nShiganshina: Armored Titan\nStohess: Female Titan"})
+AutoStartTab:CreateParagraph({Title = "Raid Info", Content = "Trost: Attack Titan\nShiganshina: Armored Titan\nStohess: Female Titan"})
 
 local ModifiersDropdown = AutoStartTab:CreateDropdown({
    Name = "Modifiers",
@@ -1585,20 +1578,29 @@ local ModifiersDropdown = AutoStartTab:CreateDropdown({
    Multi = true,
 })
 
--- Set initial visibility
-if DropdownConfig._lastType == "Raids" then
-   RaidMapDropdown:SetVisible(true)
-   RaidObjectiveDropdown:SetVisible(true)
-   RaidDifficultyDropdown:SetVisible(true)
-   MissionMapDropdown:SetVisible(false)
-   MissionObjectiveDropdown:SetVisible(false)
-   MissionDifficultyDropdown:SetVisible(false)
-end
+-- Set initial visibility based on saved type
+task.spawn(function()
+   if DropdownConfig._lastType == "Raids" then
+      RaidMapDropdown:SetVisible(true)
+      RaidObjectiveDropdown:SetVisible(true)
+      RaidDifficultyDropdown:SetVisible(true)
+      MissionMapDropdown:SetVisible(false)
+      MissionObjectiveDropdown:SetVisible(false)
+      MissionDifficultyDropdown:SetVisible(false)
+   else
+      RaidMapDropdown:SetVisible(false)
+      RaidObjectiveDropdown:SetVisible(false)
+      RaidDifficultyDropdown:SetVisible(false)
+      MissionMapDropdown:SetVisible(true)
+      MissionObjectiveDropdown:SetVisible(true)
+      MissionDifficultyDropdown:SetVisible(true)
+   end
+end)
 
 -- ==========================================
--- UPGRADES TAB
+-- UPGRADES TAB - Gear, Perks, Skill Tree
 -- ==========================================
-local UpgradesTab = Window:CreateTab("Upgrades", 4483362458)
+local UpgradesTab = Window:CreateTab("Upgrades", nil)
 
 local GearSection = UpgradesTab:CreateSection("Gear")
 
@@ -1767,7 +1769,7 @@ local SelectPerksDropdown = UpgradesTab:CreateDropdown({
    Multi = true,
 })
 
-local PerkParagraph = UpgradesTab:CreateParagraph({Title = "Info", Content = "Default perk slot is Body"})
+UpgradesTab:CreateParagraph({Title = "Info", Content = "Default perk slot is Body"})
 
 local SkillTreeSection = UpgradesTab:CreateSection("Skill Tree")
 
@@ -1887,9 +1889,9 @@ local Priority3Dropdown = UpgradesTab:CreateDropdown({
 })
 
 -- ==========================================
--- PRESTIGE & SLOT TAB
+-- PRESTIGE & SLOT TAB - Slot selection, Prestige
 -- ==========================================
-local PrestigeSlotTab = Window:CreateTab("Prestige & Slot", 4483362458)
+local PrestigeSlotTab = Window:CreateTab("Prestige & Slot", nil)
 
 local SlotSection = PrestigeSlotTab:CreateSection("Slot Selection")
 
@@ -1983,9 +1985,9 @@ local PrestigeGoldSlider = PrestigeSlotTab:CreateSlider({
 })
 
 -- ==========================================
--- FAMILY ROLL TAB
+-- FAMILY ROLL TAB - Auto Roll Family
 -- ==========================================
-local FamilyRollTab = Window:CreateTab("Family Roll", 4483362458)
+local FamilyRollTab = Window:CreateTab("Family Roll", nil)
 
 local RollSection = FamilyRollTab:CreateSection("Auto Roll Family")
 
@@ -1994,7 +1996,6 @@ local AutoRollToggle = FamilyRollTab:CreateToggle({
    CurrentValue = false,
    Flag = "AutoRollToggle",
    Callback = function(Value)
-      ToggleStates.AutoRollToggle = AutoRollToggle
       getgenv().AutoRoll = Value
       if getgenv().AutoRoll then
          if game.PlaceId ~= 13379208636 then
@@ -2060,12 +2061,12 @@ local SelectFamilyRarity = FamilyRollTab:CreateDropdown({
    Multi = true,
 })
 
-local FamilyParagraph = FamilyRollTab:CreateParagraph({Title = "Info", Content = "Mythical families won't be rolled\nSeparate families with commas & no spaces (Fritz,Yeager)"})
+FamilyRollTab:CreateParagraph({Title = "Info", Content = "Mythical families won't be rolled\nSeparate families with commas & no spaces (Fritz,Yeager)"})
 
 -- ==========================================
--- WEBHOOK & MISC TAB
+-- WEBHOOK & MISC TAB - Webhooks, FPS, Map Delete
 -- ==========================================
-local WebhookMiscTab = Window:CreateTab("Webhook & Misc", 4483362458)
+local WebhookMiscTab = Window:CreateTab("Webhook & Misc", nil)
 
 local WebhookSection = WebhookMiscTab:CreateSection("Webhooks")
 
@@ -2175,7 +2176,7 @@ local AutoReturnLobbyToggle = WebhookMiscTab:CreateToggle({
    end,
 })
 
-local FarmOptionsParagraph = WebhookMiscTab:CreateParagraph({Title = "Farm Options", Content = "Auto Execute: Queues script on teleport\nFailsafe: Returns to lobby after timeout\nOpen Second Chest: Opens premium chest"})
+WebhookMiscTab:CreateParagraph({Title = "Farm Options", Content = "Auto Execute: Queues script on teleport\nFailsafe: Returns to lobby after timeout\nOpen Second Chest: Opens premium chest"})
 
 local FarmOptionsDropdown = WebhookMiscTab:CreateDropdown({
    Name = "Farm Options",
@@ -2192,9 +2193,9 @@ local FarmOptionsDropdown = WebhookMiscTab:CreateDropdown({
 })
 
 -- ==========================================
--- DISCORD TAB
+-- DISCORD TAB - Discord info
 -- ==========================================
-local DiscordTab = Window:CreateTab("Discord", 4483362458)
+local DiscordTab = Window:CreateTab("Discord", nil)
 
 local DiscordSection = DiscordTab:CreateSection("Join Our Discord")
 
@@ -2211,12 +2212,12 @@ local JoinDiscordButton = DiscordTab:CreateButton({
    end,
 })
 
-local DiscordParagraph = DiscordTab:CreateParagraph({Title = "Discord Info", Content = "Join our Discord for updates, support, and community!\n\nhttps://discord.gg/xq5VCpFQsH"})
+DiscordTab:CreateParagraph({Title = "Discord Info", Content = "Join our Discord for updates, support, and community!\n\nhttps://discord.gg/xq5VCpFQsH"})
 
 -- ==========================================
--- SETTINGS TAB
+-- SETTINGS TAB - Keybinds, Config
 -- ==========================================
-local SettingsTab = Window:CreateTab("Settings", 4483362458)
+local SettingsTab = Window:CreateTab("Settings", nil)
 
 local KeybindsSection = SettingsTab:CreateSection("Keybinds")
 
@@ -2230,8 +2231,7 @@ local MenuKeybind = SettingsTab:CreateKeybind({
 
 local ConfigSection = SettingsTab:CreateSection("Configuration")
 
--- Rayfield handles config saving automatically with ConfigurationSaving enabled
-local ConfigParagraph = SettingsTab:CreateParagraph({Title = "Config Info", Content = "Configuration is saved automatically.\nFolder: THUB/aotr_config"})
+SettingsTab:CreateParagraph({Title = "Config Info", Content = "Configuration is saved automatically.\nFolder: THUB/aotr_config"})
 
 -- ==========================================
 -- INITIALIZATION AND LOOPS
@@ -2256,7 +2256,7 @@ lp.Idled:Connect(function()
 	virtualUser:ClickButton2(Vector2.new())
 end)
 
--- Update keybind handler
+-- Load configuration
 task.spawn(function()
    Rayfield:LoadConfiguration()
 end)
