@@ -395,12 +395,24 @@ function AutoFarm:Start()
 				end
 				
 				if getgenv().AutoFarmConfig.MovementMode == "Hover" then
-					local dir = targetHeightPos - rootPos
-					root.AssemblyLinearVelocity = dir.Magnitude > 1 and dir.Unit * getgenv().AutoFarmConfig.MoveSpeed or V3_ZERO
-				else
-					root.AssemblyLinearVelocity = V3_ZERO
-					root.CFrame = CFrame.new(targetHeightPos)
-				end
+    local dir = targetHeightPos - rootPos
+    if dir.Magnitude > 1 then
+        root.AssemblyLinearVelocity = dir.Unit * getgenv().AutoFarmConfig.MoveSpeed
+    else
+        root.AssemblyLinearVelocity = V3_ZERO
+    end
+elseif getgenv().AutoFarmConfig.MovementMode == "Teleport" then
+    root.AssemblyLinearVelocity = V3_ZERO
+    root.CFrame = CFrame.new(targetHeightPos)
+else
+    -- Default to Hover if mode is invalid
+    local dir = targetHeightPos - rootPos
+    if dir.Magnitude > 1 then
+        root.AssemblyLinearVelocity = dir.Unit * getgenv().AutoFarmConfig.MoveSpeed
+    else
+        root.AssemblyLinearVelocity = V3_ZERO
+    end
+end
 
 				if not attackTitanReady then task.wait(); continue end
 
@@ -786,8 +798,13 @@ MainTab:CreateDropdown({
 })
 
 MainTab:CreateDropdown({
-	Name = "Movement Mode", Options = {"Hover", "Teleport"}, CurrentOption = "Hover", Flag = "MovementModeDropdown",
-	Callback = function(Option) getgenv().AutoFarmConfig.MovementMode = Option end,
+    Name = "Movement Mode", 
+    Options = {"Hover", "Teleport"}, 
+    CurrentOption = "Hover", 
+    Flag = "MovementModeDropdown",
+    Callback = function(Option) 
+        getgenv().AutoFarmConfig.MovementMode = Option 
+    end,
 })
 
 MainTab:CreateDropdown({
