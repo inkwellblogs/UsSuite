@@ -1179,9 +1179,9 @@ task.spawn(function() task.wait(0.5); if getgenv().DeleteMap then DeleteMap() en
 -- ExecuteImmediateAutomation loop
 task.spawn(function() while true do pcall(ExecuteImmediateAutomation); task.wait(0.5) end end)
 
--- Auto Hide UI on load (Alternative method)
+-- Auto Hide UI on load
 task.spawn(function()
-    task.wait(3) -- Wait for full UI load
+    task.wait(3)
     
     local shouldHide = false
     pcall(function()
@@ -1191,25 +1191,33 @@ task.spawn(function()
     end)
     
     if shouldHide then
-        -- Find and hide the ScreenGui
+        -- Method 1: Sabhi ScreenGui check karo
         for _, gui in ipairs(game:GetService("CoreGui"):GetChildren()) do
-            if gui:IsA("ScreenGui") and gui.Name:find("Rayfield") then
+            if gui:IsA("ScreenGui") then
+                print("Found ScreenGui:", gui.Name)
                 gui.Enabled = false
-                print("UI Hidden via CoreGui")
-                break
             end
         end
         
-        -- Try PlayerGui too
         for _, gui in ipairs(lp.PlayerGui:GetChildren()) do
-            if gui:IsA("ScreenGui") and gui.Name:find("Rayfield") then
+            if gui:IsA("ScreenGui") then
+                print("Found ScreenGui:", gui.Name)
                 gui.Enabled = false
-                print("UI Hidden via PlayerGui")
-                break
             end
         end
+        
+        -- Method 2: Direct visibility toggle
+        pcall(function()
+            local success, err = pcall(function()
+                Rayfield.ToggleVisibility()
+            end)
+            if not success then
+                print("ToggleVisibility error:", err)
+            end
+        end)
     end
 end)
 
+Rayfield:LoadConfiguration()
 
 Rayfield:LoadConfiguration()
