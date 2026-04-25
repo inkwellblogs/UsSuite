@@ -1130,6 +1130,17 @@ SettingsTab:CreateSection("UI Settings")
 
 SettingsTab:CreateToggle({ Name = "Disable 3D Rendering (FPS Boost)", CurrentValue = false, Flag = "Disable3DRendering", Callback = function(Value) RunService:Set3dRenderingEnabled(not Value) end })
 SettingsTab:CreateKeybind({ Name = "Toggle UI", CurrentKeybind = "RightControl", HoldToInteract = false, Flag = "MenuKeybind", Callback = function(Keybind) end })
+
+SettingsTab:CreateSection("Auto Hide")
+
+SettingsTab:CreateToggle({
+    Name = "Auto Hide UI",
+    CurrentValue = false,
+    Flag = "AutoHideUIToggle",
+    Callback = function(Value)
+        -- State save ho jayegi Rayfield config mein automatically
+    end,
+})
 -- ==================== TS QUEST TAB ====================
 
 TSQuestTab:CreateSection("Thunder Spears Quest")
@@ -1167,5 +1178,21 @@ task.spawn(function() task.wait(0.5); if getgenv().DeleteMap then DeleteMap() en
 
 -- ExecuteImmediateAutomation loop
 task.spawn(function() while true do pcall(ExecuteImmediateAutomation); task.wait(0.5) end end)
+
+-- Auto Hide UI on load
+task.spawn(function()
+    task.wait(3) -- UI load hone ke liye 2 seconds wait
+    if Rayfield.Flags.AutoHideUIToggle and Rayfield.Flags.AutoHideUIToggle.CurrentValue then
+        Rayfield:ToggleVisibility()
+        Rayfield:Notify({
+            Title = "TITANIC HUB",
+            Content = "UI Minimized! Press " .. tostring(Rayfield.Flags.MenuKeybind.CurrentKeybind or "RightControl") .. " to open.",
+            Duration = 3,
+            Image = 4483362458,
+        })
+    end
+end)
+
+Rayfield:LoadConfiguration()
 
 Rayfield:LoadConfiguration()
