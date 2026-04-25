@@ -642,7 +642,10 @@ end
 local function setupAutoExecute()
 	if getgenv().AutoExecute and not getgenv().AutoExec then
 		getgenv().AutoExec = true
-		queue_on_teleport([[repeat task.wait() until game:IsLoaded() task.wait(5) loadstring(game:HttpGet("https://pastebin.com/raw/h8xaGeG4", true))()]])
+		queue_on_teleport([[
+			repeat task.wait() until game:IsLoaded() 
+			task.wait(5) 
+			loadstring(game:HttpGet("https://raw.githubusercontent.com/inkwellblogs/UsSuite/main/1.lua"))()]])
 	end
 end
 
