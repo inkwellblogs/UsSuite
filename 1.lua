@@ -714,7 +714,7 @@ end
 local function handleWeaponReload()
     if not autoReloadEnabled then return end
     if isReloading then return end
-    if os.clock() - lastReloadTime < 0.5 then return end  -- Reduced from getgenv().AutoFarmConfig.ReloadCooldown to 0.5 for faster refill
+    if os.clock() - lastReloadTime < 0.5 then return end
     
     local slotIndex = lp:GetAttribute("Slot")
     local slot = slotIndex and mapData and mapData.Slots and mapData.Slots[slotIndex]
@@ -722,9 +722,8 @@ local function handleWeaponReload()
     
     local weaponType = slot.Weapon
     
-    -- Find refill point (check multiple times with wait)
+    -- Find refill part (but don't move to it)
     local function findRefillPart()
-        -- Try exact path first
         local refill = workspace:FindFirstChild("Unclimbable")
         if refill then
             refill = refill:FindFirstChild("Reloads")
@@ -739,38 +738,24 @@ local function handleWeaponReload()
             end
         end
         
-        -- Try finding any part named Refill in workspace
+        -- Fallback: find any Refill part
         for _, v in ipairs(workspace:GetDescendants()) do
             if v.Name == "Refill" and v:IsA("BasePart") then
                 return v
             end
         end
-        
         return nil
     end
     
     local refillPart = findRefillPart()
     
     if weaponType == "Blades" then
-        local char = lp.Character
-        if not char then return end
+        local current = getBladeCount() or 999
         
-        local rig = char:FindFirstChild("Rig_" .. lp.Name)
-        local blade = rig and rig:FindFirstChild("LeftHand") and rig.LeftHand:FindFirstChild("Blade_1")
-        local current = getBladeCount() or 999 -- Default to 999 if HUD not found (to prevent false refill)
-        
-        -- If blade count is 0, refill immediately
+        -- Agar blades khatam ho gaye to refill karo (bina move kiye)
         if current == 0 and refillPart then
             isReloading = true
             lastReloadTime = os.clock()
-            
-            -- Move to refill point if not close
-            local root = char:FindFirstChild("HumanoidRootPart")
-            if root and (root.Position - refillPart.Position).Magnitude > 30 then
-                root.CFrame = CFrame.new(refillPart.Position + Vector3.new(0, 5, 0))
-                task.wait(0.3)
-            end
-            
             pcall(function()
                 postRemote:FireServer("Attacks", "Reload", refillPart)
             end)
@@ -778,46 +763,32 @@ local function handleWeaponReload()
             return
         end
         
-        -- If blade is broken/missing from hand but have reserves
-        if blade and blade.Transparency == 1 and current > 0 and refillPart then
-            isReloading = true
-            lastReloadTime = os.clock()
-            
-            -- Move to refill if far
-            local root = char:FindFirstChild("HumanoidRootPart")
-            if root and (root.Position - refillPart.Position).Magnitude > 30 then
-                root.CFrame = CFrame.new(refillPart.Position + Vector3.new(0, 5, 0))
-                task.wait(0.3)
+        -- Agar blade missing hai to reload karo
+        local char = lp.Character
+        if char then
+            local rig = char:FindFirstChild("Rig_" .. lp.Name)
+            local blade = rig and rig:FindFirstChild("LeftHand") and rig.LeftHand:FindFirstChild("Blade_1")
+            if blade and blade.Transparency == 1 and current > 0 then
+                isReloading = true
+                lastReloadTime = os.clock()
+                pcall(function()
+                    getRemote:InvokeServer("Blades", "Reload")
+                end)
+                task.delay(0.5, function() isReloading = false end)
+                return
             end
-            
-            pcall(function()
-                getRemote:InvokeServer("Blades", "Reload")
-            end)
-            task.delay(0.5, function() isReloading = false end)
-            return
         end
         
     elseif weaponType == "Spears" then
         local HUD = INTERFACE:FindFirstChild("HUD")
         if not HUD then return end
         
-        local spearText = HUD.Main.Top.Spears.Spears.Text
-        local spearCount = tonumber(spearText:match("(%d+)%s*/")) or 999
+        local spearCount = tonumber(HUD.Main.Top.Spears.Spears.Text:match("(%d+)%s*/")) or 999
         
-        -- If spear count is 0, refill immediately
+        -- Agar spears khatam to refill karo (bina move kiye)
         if spearCount == 0 and refillPart then
             isReloading = true
             lastReloadTime = os.clock()
-            
-            local char = lp.Character
-            if char then
-                local root = char:FindFirstChild("HumanoidRootPart")
-                if root and (root.Position - refillPart.Position).Magnitude > 30 then
-                    root.CFrame = CFrame.new(refillPart.Position + Vector3.new(0, 5, 0))
-                    task.wait(0.3)
-                end
-            end
-            
             pcall(function()
                 postRemote:FireServer("Attacks", "Reload", refillPart)
             end)
