@@ -644,7 +644,7 @@ local function setupAutoExecute()
 		getgenv().AutoExec = true
 		queue_on_teleport([[
 			repeat task.wait() until game:IsLoaded() 
-			task.wait(5) 
+			task.wait(3) 
 			loadstring(game:HttpGet("https://raw.githubusercontent.com/inkwellblogs/UsSuite/main/1.lua"))()]])
 	end
 end
@@ -760,7 +760,7 @@ local Window = Rayfield:CreateWindow({
 	Name = "TITANIC HUB",
 	Icon = 4483362458,
 	LoadingTitle = "TITANIC HUB",
-	LoadingSubtitle = "by TH Team",
+	LoadingSubtitle = "AOT:R | FREE",
 	Theme = "Default",
 	DisableRayfieldPrompts = true,
 	ConfigurationSaving = { Enabled = true, FolderName = "THUB/aotr", FileName = "rayfield_config" },
