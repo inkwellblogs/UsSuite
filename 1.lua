@@ -1179,7 +1179,7 @@ task.spawn(function() task.wait(0.5); if getgenv().DeleteMap then DeleteMap() en
 -- ExecuteImmediateAutomation loop
 task.spawn(function() while true do pcall(ExecuteImmediateAutomation); task.wait(0.5) end end)
 
--- Auto Hide UI on load
+-- Auto Hide UI on load (ONLY Rayfield UI hide karega)
 task.spawn(function()
     task.wait(3)
     
@@ -1191,33 +1191,36 @@ task.spawn(function()
     end)
     
     if shouldHide then
-        -- Method 1: Sabhi ScreenGui check karo
-        for _, gui in ipairs(game:GetService("CoreGui"):GetChildren()) do
-            if gui:IsA("ScreenGui") then
-                print("Found ScreenGui:", gui.Name)
-                gui.Enabled = false
+        -- Sirf Rayfield UI find karo aur hide karo
+        local function hideRayfieldUI(parent)
+            for _, child in ipairs(parent:GetChildren()) do
+                if child:IsA("ScreenGui") then
+                    -- Check if this is Rayfield by looking for its elements
+                    for _, element in ipairs(child:GetChildren()) do
+                        if element.Name == "Main" or element.Name == "Container" then
+                            -- Check for Rayfield-specific frames
+                            for _, subElement in ipairs(element:GetChildren()) do
+                                if subElement.Name == "TabContainer" or subElement.Name == "Elements" then
+                                    child.Enabled = false
+                                    print("Rayfield UI Hidden Successfully!")
+                                    return true
+                                end
+                            end
+                        end
+                    end
+                end
             end
+            return false
         end
         
-        for _, gui in ipairs(lp.PlayerGui:GetChildren()) do
-            if gui:IsA("ScreenGui") then
-                print("Found ScreenGui:", gui.Name)
-                gui.Enabled = false
-            end
-        end
-        
-        -- Method 2: Direct visibility toggle
-        pcall(function()
-            local success, err = pcall(function()
-                Rayfield.ToggleVisibility()
+        -- Check CoreGui
+        if not hideRayfieldUI(game:GetService("CoreGui")) then
+            -- Check PlayerGui
+            pcall(function()
+                hideRayfieldUI(lp.PlayerGui)
             end)
-            if not success then
-                print("ToggleVisibility error:", err)
-            end
-        end)
+        end
     end
 end)
-
-Rayfield:LoadConfiguration()
 
 Rayfield:LoadConfiguration()
