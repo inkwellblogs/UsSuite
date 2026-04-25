@@ -770,7 +770,7 @@ local MainTab = Window:CreateTab("Main", 4483362458)
 local UpgradesTab = Window:CreateTab("Upgrades", 4483362458)
 local MiscTab = Window:CreateTab("Misc", 4483362458)
 local SettingsTab = Window:CreateTab("Settings", 4483362458)
-
+local TSQuestTab = Window:CreateTab("TS Quest", 4483362458)
 -- ==================== MAIN TAB ====================
 MainTab:CreateSection("Farming")
 
@@ -1126,6 +1126,34 @@ SettingsTab:CreateSection("UI Settings")
 
 SettingsTab:CreateToggle({ Name = "Disable 3D Rendering (FPS Boost)", CurrentValue = false, Flag = "Disable3DRendering", Callback = function(Value) RunService:Set3dRenderingEnabled(not Value) end })
 SettingsTab:CreateKeybind({ Name = "Toggle UI", CurrentKeybind = "RightControl", HoldToInteract = false, Flag = "MenuKeybind", Callback = function(Keybind) end })
+-- ==================== TS QUEST TAB ====================
+local TSQuestTab = Window:CreateTab("TS Quest", 4483362458)
+
+TSQuestTab:CreateSection("Titan Shifting Quest")
+
+TSQuestTab:CreateLabel("🔜 COMING SOON")
+TSQuestTab:CreateLabel("Auto TS Quest features are under development.")
+TSQuestTab:CreateLabel("Stay tuned for updates!")
+TSQuestTab:CreateLabel("")
+
+TSQuestTab:CreateButton({
+    Name = "Check for Updates",
+    Callback = function()
+        Rayfield:Notify({
+            Title = "TS Quest",
+            Content = "This feature is coming soon! Check our Discord for updates.",
+            Duration = 5,
+            Image = 4483362458,
+        })
+    end,
+})
+
+TSQuestTab:CreateLabel("")
+TSQuestTab:CreateLabel("Planned Features:")
+TSQuestTab:CreateLabel("• Auto Complete TS Quests")
+TSQuestTab:CreateLabel("• Shift Progress Tracker")
+TSQuestTab:CreateLabel("• Quest Requirements Checker")
+TSQuestTab:CreateLabel("• Auto Kill Titans for Progress")
 
 -- Anti-AFK
 local virtualUser = game:GetService("VirtualUser")
