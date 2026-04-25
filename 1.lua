@@ -1129,7 +1129,7 @@ SettingsTab:CreateKeybind({ Name = "Toggle UI", CurrentKeybind = "RightControl",
 -- ==================== TS QUEST TAB ====================
 local TSQuestTab = Window:CreateTab("TS Quest", 4483362458)
 
-TSQuestTab:CreateSection("Titan Shifting Quest")
+TSQuestTab:CreateSection("TS Quest")
 
 TSQuestTab:CreateLabel("🔜 COMING SOON")
 TSQuestTab:CreateLabel("Auto TS Quest features are under development.")
@@ -1147,13 +1147,6 @@ TSQuestTab:CreateButton({
         })
     end,
 })
-
-TSQuestTab:CreateLabel("")
-TSQuestTab:CreateLabel("Planned Features:")
-TSQuestTab:CreateLabel("• Auto Complete TS Quests")
-TSQuestTab:CreateLabel("• Shift Progress Tracker")
-TSQuestTab:CreateLabel("• Quest Requirements Checker")
-TSQuestTab:CreateLabel("• Auto Kill Titans for Progress")
 
 -- Anti-AFK
 local virtualUser = game:GetService("VirtualUser")
