@@ -712,35 +712,127 @@ local function getBladeCount()
 end
 
 local function handleWeaponReload()
-	if not autoReloadEnabled or isReloading then return end
-	if os.clock() - lastReloadTime < getgenv().AutoFarmConfig.ReloadCooldown then return end
-	local slotIndex = lp:GetAttribute("Slot")
-	local slot = slotIndex and mapData and mapData.Slots and mapData.Slots[slotIndex]
-	if not slot then return end
-	local weaponType = slot.Weapon
-
-	if weaponType == "Blades" then
-		local char = lp.Character
-		local rig = char and char:FindFirstChild("Rig_" .. lp.Name)
-		local blade = rig and rig:FindFirstChild("LeftHand") and rig.LeftHand:FindFirstChild("Blade_1")
-		local current = getBladeCount() or 0
-		if current == 0 and autoRefillEnabled then
-			local refillPart = workspace:FindFirstChild("Unclimbable") and workspace.Unclimbable:FindFirstChild("Reloads") and workspace.Unclimbable.Reloads:FindFirstChild("GasTanks") and workspace.Unclimbable.Reloads.GasTanks:FindFirstChild("Refill")
-			if refillPart then isReloading = true; lastReloadTime = os.clock(); pcall(function() postRemote:FireServer("Attacks", "Reload", refillPart) end); task.delay(1, function() isReloading = false end); return end
-		end
-		if blade and blade.Transparency == 1 and current > 0 then isReloading = true; lastReloadTime = os.clock(); pcall(function() getRemote:InvokeServer("Blades", "Reload") end); task.delay(0.5, function() isReloading = false end); return end
-	elseif weaponType == "Spears" then
-		local HUD = INTERFACE:FindFirstChild("HUD")
-		if not HUD then return end
-		local spearCount = tonumber(HUD.Main.Top.Spears.Spears.Text:match("(%d+)%s*/")) or 0
-		if spearCount == 0 and autoRefillEnabled then
-			local refillPart = workspace:FindFirstChild("Unclimbable") and workspace.Unclimbable:FindFirstChild("Reloads") and workspace.Unclimbable.Reloads:FindFirstChild("GasTanks") and workspace.Unclimbable.Reloads.GasTanks:FindFirstChild("Refill")
-			if refillPart then isReloading = true; lastReloadTime = os.clock(); postRemote:FireServer("Attacks", "Reload", refillPart); task.delay(1, function() isReloading = false end) end
-		end
-	end
+    if not autoReloadEnabled then return end
+    if isReloading then return end
+    if os.clock() - lastReloadTime < 0.5 then return end  -- Reduced from getgenv().AutoFarmConfig.ReloadCooldown to 0.5 for faster refill
+    
+    local slotIndex = lp:GetAttribute("Slot")
+    local slot = slotIndex and mapData and mapData.Slots and mapData.Slots[slotIndex]
+    if not slot then return end
+    
+    local weaponType = slot.Weapon
+    
+    -- Find refill point (check multiple times with wait)
+    local function findRefillPart()
+        -- Try exact path first
+        local refill = workspace:FindFirstChild("Unclimbable")
+        if refill then
+            refill = refill:FindFirstChild("Reloads")
+            if refill then
+                refill = refill:FindFirstChild("GasTanks")
+                if refill then
+                    refill = refill:FindFirstChild("Refill")
+                    if refill then
+                        return refill
+                    end
+                end
+            end
+        end
+        
+        -- Try finding any part named Refill in workspace
+        for _, v in ipairs(workspace:GetDescendants()) do
+            if v.Name == "Refill" and v:IsA("BasePart") then
+                return v
+            end
+        end
+        
+        return nil
+    end
+    
+    local refillPart = findRefillPart()
+    
+    if weaponType == "Blades" then
+        local char = lp.Character
+        if not char then return end
+        
+        local rig = char:FindFirstChild("Rig_" .. lp.Name)
+        local blade = rig and rig:FindFirstChild("LeftHand") and rig.LeftHand:FindFirstChild("Blade_1")
+        local current = getBladeCount() or 999 -- Default to 999 if HUD not found (to prevent false refill)
+        
+        -- If blade count is 0, refill immediately
+        if current == 0 and refillPart then
+            isReloading = true
+            lastReloadTime = os.clock()
+            
+            -- Move to refill point if not close
+            local root = char:FindFirstChild("HumanoidRootPart")
+            if root and (root.Position - refillPart.Position).Magnitude > 30 then
+                root.CFrame = CFrame.new(refillPart.Position + Vector3.new(0, 5, 0))
+                task.wait(0.3)
+            end
+            
+            pcall(function()
+                postRemote:FireServer("Attacks", "Reload", refillPart)
+            end)
+            task.delay(0.8, function() isReloading = false end)
+            return
+        end
+        
+        -- If blade is broken/missing from hand but have reserves
+        if blade and blade.Transparency == 1 and current > 0 and refillPart then
+            isReloading = true
+            lastReloadTime = os.clock()
+            
+            -- Move to refill if far
+            local root = char:FindFirstChild("HumanoidRootPart")
+            if root and (root.Position - refillPart.Position).Magnitude > 30 then
+                root.CFrame = CFrame.new(refillPart.Position + Vector3.new(0, 5, 0))
+                task.wait(0.3)
+            end
+            
+            pcall(function()
+                getRemote:InvokeServer("Blades", "Reload")
+            end)
+            task.delay(0.5, function() isReloading = false end)
+            return
+        end
+        
+    elseif weaponType == "Spears" then
+        local HUD = INTERFACE:FindFirstChild("HUD")
+        if not HUD then return end
+        
+        local spearText = HUD.Main.Top.Spears.Spears.Text
+        local spearCount = tonumber(spearText:match("(%d+)%s*/")) or 999
+        
+        -- If spear count is 0, refill immediately
+        if spearCount == 0 and refillPart then
+            isReloading = true
+            lastReloadTime = os.clock()
+            
+            local char = lp.Character
+            if char then
+                local root = char:FindFirstChild("HumanoidRootPart")
+                if root and (root.Position - refillPart.Position).Magnitude > 30 then
+                    root.CFrame = CFrame.new(refillPart.Position + Vector3.new(0, 5, 0))
+                    task.wait(0.3)
+                end
+            end
+            
+            pcall(function()
+                postRemote:FireServer("Attacks", "Reload", refillPart)
+            end)
+            task.delay(0.8, function() isReloading = false end)
+            return
+        end
+    end
 end
 
-task.spawn(function() while true do pcall(handleWeaponReload); task.wait(0.5) end end)
+task.spawn(function()
+    while true do
+        pcall(handleWeaponReload)
+        task.wait(0.3) -- Check every 0.1 seconds for faster response
+    end
+end)
 
 getgenv().AutoEscape = false
 postRemote.OnClientEvent:Connect(function(...)
