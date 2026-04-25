@@ -791,7 +791,7 @@ local function handleWeaponReload()
             end
             
             -- Agar gas station nahi jaana aur phir bhi 0 hai to gas station jaao (force)
-            task.delay(2, function()
+            task.delay(7, function()
                 if not getgenv().GoToGasStation then
                     local newCount = getBladeCount()
                     if newCount and newCount == 0 and refillPart then
@@ -859,7 +859,7 @@ local function handleWeaponReload()
             end
             
             -- Agar gas station nahi jaana aur phir bhi 0 hai to force
-            task.delay(5, function()
+            task.delay(7, function()
                 if not getgenv().GoToGasStation then
                     local newCount = tonumber(HUD.Main.Top.Spears.Spears.Text:match("(%d+)%s*/"))
                     if newCount and newCount == 0 and refillPart then
@@ -879,7 +879,7 @@ end
 task.spawn(function()
     while true do
         pcall(handleWeaponReload)
-        task.wait(0.1) -- Check every 0.1 seconds for faster response
+        task.wait(0.2) -- Check every 0.1 seconds for faster response
     end
 end)
 
