@@ -771,6 +771,7 @@ local UpgradesTab = Window:CreateTab("Upgrades", 4483362458)
 local MiscTab = Window:CreateTab("Misc", 4483362458)
 local SettingsTab = Window:CreateTab("Settings", 4483362458)
 local TSQuestTab = Window:CreateTab("TS Quest", 4483362458)
+
 -- ==================== MAIN TAB ====================
 MainTab:CreateSection("Farming")
 
@@ -1127,24 +1128,32 @@ SettingsTab:CreateSection("UI Settings")
 SettingsTab:CreateToggle({ Name = "Disable 3D Rendering (FPS Boost)", CurrentValue = false, Flag = "Disable3DRendering", Callback = function(Value) RunService:Set3dRenderingEnabled(not Value) end })
 SettingsTab:CreateKeybind({ Name = "Toggle UI", CurrentKeybind = "RightControl", HoldToInteract = false, Flag = "MenuKeybind", Callback = function(Keybind) end })
 -- ==================== TS QUEST TAB ====================
-local TSQuestTab = Window:CreateTab("TS Quest", 4483362458)
+
+TSQuestTab:CreateSection("Titan Shifting Quest")
 
 TSQuestTab:CreateLabel("🔜 COMING SOON")
-TSQuestTab:CreateLabel("Auto TS Quest features are under development.")
+TSQuestTab:CreateLabel("Titan Shifting Quest features are under development.")
 TSQuestTab:CreateLabel("Stay tuned for updates!")
-TSQuestTab:CreateLabel("")
 
 TSQuestTab:CreateButton({
     Name = "Check for Updates",
     Callback = function()
         Rayfield:Notify({
             Title = "TS Quest",
-            Content = "This feature is coming soon! Check our Discord for updates.",
+            Content = "This feature is coming soon! Check Discord for updates.",
             Duration = 5,
             Image = 4483362458,
         })
     end,
 })
+
+TSQuestTab:CreateLabel("")
+TSQuestTab:CreateLabel("Planned Features:")
+TSQuestTab:CreateLabel("• Auto create watch tower")
+TSQuestTab:CreateLabel("• Auto find missing supplies")
+TSQuestTab:CreateLabel("• Auto defend missing supplies")
+TSQuestTab:CreateLabel("• Auto escort horse carriage")
+TSQuestTab:CreateLabel("• Auto collect ice burst stones")
 
 -- Anti-AFK
 local virtualUser = game:GetService("VirtualUser")
