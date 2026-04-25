@@ -1147,7 +1147,7 @@ TSQuestTab:CreateButton({
     end,
 })
 
-TSQuestTab:CreateLabel("")
+TSQuestTab:CreateLabel("-----------------------------")
 TSQuestTab:CreateLabel("Planned Features:")
 TSQuestTab:CreateLabel("• Auto create watch tower")
 TSQuestTab:CreateLabel("• Auto find missing supplies")
