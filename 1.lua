@@ -1179,7 +1179,7 @@ task.spawn(function() task.wait(0.5); if getgenv().DeleteMap then DeleteMap() en
 -- ExecuteImmediateAutomation loop
 task.spawn(function() while true do pcall(ExecuteImmediateAutomation); task.wait(0.5) end end)
 
--- Auto Hide UI on load (ONLY Rayfield UI hide karega)
+-- Auto Hide UI on load (Simple method)
 task.spawn(function()
     task.wait(3)
     
@@ -1191,35 +1191,11 @@ task.spawn(function()
     end)
     
     if shouldHide then
-        -- Sirf Rayfield UI find karo aur hide karo
-        local function hideRayfieldUI(parent)
-            for _, child in ipairs(parent:GetChildren()) do
-                if child:IsA("ScreenGui") then
-                    -- Check if this is Rayfield by looking for its elements
-                    for _, element in ipairs(child:GetChildren()) do
-                        if element.Name == "Main" or element.Name == "Container" then
-                            -- Check for Rayfield-specific frames
-                            for _, subElement in ipairs(element:GetChildren()) do
-                                if subElement.Name == "TabContainer" or subElement.Name == "Elements" then
-                                    child.Enabled = false
-                                    print("Rayfield UI Hidden Successfully!")
-                                    return true
-                                end
-                            end
-                        end
-                    end
-                end
-            end
-            return false
-        end
-        
-        -- Check CoreGui
-        if not hideRayfieldUI(game:GetService("CoreGui")) then
-            -- Check PlayerGui
-            pcall(function()
-                hideRayfieldUI(lp.PlayerGui)
-            end)
-        end
+        -- Sirf Rayfield UI toggle karo
+        pcall(function()
+            Rayfield:ToggleVisibility()
+            print("Rayfield UI Toggled - Check if hidden")
+        end)
     end
 end)
 
