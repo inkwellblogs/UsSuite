@@ -1129,10 +1129,10 @@ SettingsTab:CreateToggle({ Name = "Disable 3D Rendering (FPS Boost)", CurrentVal
 SettingsTab:CreateKeybind({ Name = "Toggle UI", CurrentKeybind = "RightControl", HoldToInteract = false, Flag = "MenuKeybind", Callback = function(Keybind) end })
 -- ==================== TS QUEST TAB ====================
 
-TSQuestTab:CreateSection("Titan Shifting Quest")
+TSQuestTab:CreateSection("Thunder Spears Quest")
 
 TSQuestTab:CreateLabel("🔜 COMING SOON")
-TSQuestTab:CreateLabel("Titan Shifting Quest features are under development.")
+TSQuestTab:CreateLabel("Thunder Spears Quest features are under development.")
 TSQuestTab:CreateLabel("Stay tuned for updates!")
 
 TSQuestTab:CreateButton({
