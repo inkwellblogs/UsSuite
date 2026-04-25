@@ -1133,12 +1133,12 @@ SettingsTab:CreateKeybind({ Name = "Toggle UI", CurrentKeybind = "RightControl",
 
 SettingsTab:CreateSection("Auto Hide")
 
-SettingsTab:CreateToggle({
-    Name = "Auto Hide UI",
+local AutoHideToggle = SettingsTab:CreateToggle({
+    Name = "Auto Hide UI on Load",
     CurrentValue = false,
     Flag = "AutoHideUIToggle",
     Callback = function(Value)
-        -- State save ho jayegi Rayfield config mein automatically
+        -- Config save ho jayegi automatically
     end,
 })
 -- ==================== TS QUEST TAB ====================
@@ -1181,18 +1181,31 @@ task.spawn(function() while true do pcall(ExecuteImmediateAutomation); task.wait
 
 -- Auto Hide UI on load
 task.spawn(function()
-    task.wait(3) -- UI load hone ke liye 2 seconds wait
-    if Rayfield.Flags.AutoHideUIToggle and Rayfield.Flags.AutoHideUIToggle.CurrentValue then
-        Rayfield:ToggleVisibility()
-        Rayfield:Notify({
-            Title = "TITANIC HUB",
-            Content = "UI Minimized! Press " .. tostring(Rayfield.Flags.MenuKeybind.CurrentKeybind or "RightControl") .. " to open.",
-            Duration = 3,
-            Image = 4483362458,
-        })
+    task.wait(2) -- UI load hone ke liye 2 seconds wait
+    
+    local isAutoHide = false
+    
+    -- Check flag from Rayfield config
+    pcall(function()
+        if Rayfield.Flags and Rayfield.Flags.AutoHideUIToggle then
+            isAutoHide = Rayfield.Flags.AutoHideUIToggle.CurrentValue
+        end
+    end)
+    
+    if isAutoHide then
+        -- Hide the UI
+        pcall(function()
+            if Window and Window.Root then
+                Window.Root.Visible = false
+            end
+        end)
+        
+        -- Alternative method using Rayfield's internal functions
+        pcall(function()
+            Rayfield:ToggleVisibility()
+        end)
     end
 end)
 
-Rayfield:LoadConfiguration()
 
 Rayfield:LoadConfiguration()
