@@ -1179,31 +1179,35 @@ task.spawn(function() task.wait(0.5); if getgenv().DeleteMap then DeleteMap() en
 -- ExecuteImmediateAutomation loop
 task.spawn(function() while true do pcall(ExecuteImmediateAutomation); task.wait(0.5) end end)
 
--- Auto Hide UI on load
+-- Auto Hide UI on load (Alternative method)
 task.spawn(function()
-    task.wait(2) -- UI load hone ke liye 2 seconds wait
+    task.wait(3) -- Wait for full UI load
     
-    local isAutoHide = false
-    
-    -- Check flag from Rayfield config
+    local shouldHide = false
     pcall(function()
         if Rayfield.Flags and Rayfield.Flags.AutoHideUIToggle then
-            isAutoHide = Rayfield.Flags.AutoHideUIToggle.CurrentValue
+            shouldHide = Rayfield.Flags.AutoHideUIToggle.CurrentValue
         end
     end)
     
-    if isAutoHide then
-        -- Hide the UI
-        pcall(function()
-            if Window and Window.Root then
-                Window.Root.Visible = false
+    if shouldHide then
+        -- Find and hide the ScreenGui
+        for _, gui in ipairs(game:GetService("CoreGui"):GetChildren()) do
+            if gui:IsA("ScreenGui") and gui.Name:find("Rayfield") then
+                gui.Enabled = false
+                print("UI Hidden via CoreGui")
+                break
             end
-        end)
+        end
         
-        -- Alternative method using Rayfield's internal functions
-        pcall(function()
-            Rayfield:ToggleVisibility()
-        end)
+        -- Try PlayerGui too
+        for _, gui in ipairs(lp.PlayerGui:GetChildren()) do
+            if gui:IsA("ScreenGui") and gui.Name:find("Rayfield") then
+                gui.Enabled = false
+                print("UI Hidden via PlayerGui")
+                break
+            end
+        end
     end
 end)
 
