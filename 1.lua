@@ -714,7 +714,7 @@ end
 local function handleWeaponReload()
     if not autoReloadEnabled then return end
     if isReloading then return end
-    if os.clock() - lastReloadTime < 1 then return end -- 1 second cooldown
+    if os.clock() - lastReloadTime < 1 then return end
     
     local slotIndex = lp:GetAttribute("Slot")
     local slot = slotIndex and mapData and mapData.Slots and mapData.Slots[slotIndex]
@@ -722,9 +722,7 @@ local function handleWeaponReload()
     
     local weaponType = slot.Weapon
     
-    -- Aggressive refill part finder
     local function findRefillPart()
-        -- Try direct path
         local unclimbable = workspace:FindFirstChild("Unclimbable")
         if unclimbable then
             local reloads = unclimbable:FindFirstChild("Reloads")
@@ -739,57 +737,65 @@ local function handleWeaponReload()
             end
         end
         
-        -- Try ReplicatedStorage (some games have refill parts there)
-        local rs = game:GetService("ReplicatedStorage")
-        for _, v in ipairs(rs:GetDescendants()) do
+        -- Fallback search
+        for _, v in ipairs(workspace:GetDescendants()) do
             if v.Name == "Refill" and v:IsA("BasePart") then
                 return v
             end
         end
-        
         return nil
     end
     
     local refillPart = findRefillPart()
     local char = lp.Character
     if not char then return end
+    local root = char:FindFirstChild("HumanoidRootPart")
+    
+    -- Function to move to gas station
+    local function moveToGasStation()
+        if root and refillPart then
+            local distance = (root.Position - refillPart.Position).Magnitude
+            if distance > 30 then
+                root.CFrame = CFrame.new(refillPart.Position + Vector3.new(0, 10, 0))
+                task.wait(0.5)
+            end
+        end
+    end
     
     if weaponType == "Blades" then
         local current = getBladeCount()
         if not current then return end
         
-        -- Agar 0 blades hai to refill try karo
         if current == 0 then
             isReloading = true
             lastReloadTime = os.clock()
             
-            -- Try with refill part first
+            -- Agar gas station jaana hai to pehle move karo
+            if getgenv().GoToGasStation then
+                moveToGasStation()
+            end
+            
+            -- Refill karo
             if refillPart then
                 pcall(function()
                     postRemote:FireServer("Attacks", "Reload", refillPart)
                 end)
-            end
-            
-            -- Backup: try without refill part
-            if not refillPart then
+            else
+                -- Backup: direct reload try
                 pcall(function()
-                    -- Try direct reload remote
                     getRemote:InvokeServer("Blades", "Reload")
                 end)
                 pcall(function()
-                    -- Try alternative method
                     postRemote:FireServer("Attacks", "Reload")
                 end)
             end
             
-            -- Agar phir bhi 0 hai to refill part ke paas jaane do (last resort)
-            task.delay(1.5, function()
-                local newCount = getBladeCount()
-                if newCount and newCount == 0 and refillPart then
-                    local root = char:FindFirstChild("HumanoidRootPart")
-                    if root then
-                        root.CFrame = CFrame.new(refillPart.Position + Vector3.new(0, 10, 0))
-                        task.wait(0.3)
+            -- Agar gas station nahi jaana aur phir bhi 0 hai to gas station jaao (force)
+            task.delay(2, function()
+                if not getgenv().GoToGasStation then
+                    local newCount = getBladeCount()
+                    if newCount and newCount == 0 and refillPart then
+                        moveToGasStation()
                         pcall(function()
                             postRemote:FireServer("Attacks", "Reload", refillPart)
                         end)
@@ -800,13 +806,18 @@ local function handleWeaponReload()
             return
         end
         
-        -- Blade equipment check
+        -- Blade equip check
         local rig = char:FindFirstChild("Rig_" .. lp.Name)
         if rig then
             local blade = rig:FindFirstChild("LeftHand") and rig.LeftHand:FindFirstChild("Blade_1")
             if blade and blade.Transparency == 1 and current > 0 then
                 isReloading = true
                 lastReloadTime = os.clock()
+                
+                if getgenv().GoToGasStation then
+                    moveToGasStation()
+                end
+                
                 pcall(function()
                     getRemote:InvokeServer("Blades", "Reload")
                 end)
@@ -823,20 +834,22 @@ local function handleWeaponReload()
         local spearCount = tonumber(spearText:match("(%d+)%s*/"))
         if not spearCount then return end
         
-        -- Agar 0 spears hai to refill try karo
         if spearCount == 0 then
             isReloading = true
             lastReloadTime = os.clock()
             
-            -- Try with refill part first
+            -- Agar gas station jaana hai to pehle move karo
+            if getgenv().GoToGasStation then
+                moveToGasStation()
+            end
+            
+            -- Refill karo
             if refillPart then
                 pcall(function()
                     postRemote:FireServer("Attacks", "Reload", refillPart)
                 end)
-            end
-            
-            -- Backup methods
-            if not refillPart then
+            else
+                -- Backup methods
                 pcall(function()
                     getRemote:InvokeServer("Spears", "Reload")
                 end)
@@ -845,14 +858,12 @@ local function handleWeaponReload()
                 end)
             end
             
-            -- Last resort: move to refill
-            task.delay(1.5, function()
-                local newCount = tonumber(HUD.Main.Top.Spears.Spears.Text:match("(%d+)%s*/"))
-                if newCount and newCount == 0 and refillPart then
-                    local root = char:FindFirstChild("HumanoidRootPart")
-                    if root then
-                        root.CFrame = CFrame.new(refillPart.Position + Vector3.new(0, 10, 0))
-                        task.wait(0.3)
+            -- Agar gas station nahi jaana aur phir bhi 0 hai to force
+            task.delay(5, function()
+                if not getgenv().GoToGasStation then
+                    local newCount = tonumber(HUD.Main.Top.Spears.Spears.Text:match("(%d+)%s*/"))
+                    if newCount and newCount == 0 and refillPart then
+                        moveToGasStation()
                         pcall(function()
                             postRemote:FireServer("Attacks", "Reload", refillPart)
                         end)
@@ -1261,6 +1272,18 @@ SettingsTab:CreateSection("UI Settings")
 SettingsTab:CreateToggle({ Name = "Disable 3D Rendering (FPS Boost)", CurrentValue = false, Flag = "Disable3DRendering", Callback = function(Value) RunService:Set3dRenderingEnabled(not Value) end })
 SettingsTab:CreateKeybind({ Name = "Toggle UI", CurrentKeybind = "RightControl", HoldToInteract = false, Flag = "MenuKeybind", Callback = function(Keybind) end })
 
+SettingsTab:CreateSection("Refill Settings")
+
+SettingsTab:CreateToggle({
+    Name = "Go to Gas Station for Refill",
+    CurrentValue = false,
+    Flag = "GoToGasStationToggle",
+    Callback = function(Value)
+        getgenv().GoToGasStation = Value
+    end,
+})
+
+SettingsTab:CreateLabel("ON = Gas station jayega | OFF = Spot par refill")
 -- ==================== TS QUEST TAB ====================
 
 TSQuestTab:CreateSection("Thunder Spears Quest")
