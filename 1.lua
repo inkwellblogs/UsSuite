@@ -830,7 +830,7 @@ end
 task.spawn(function()
     while true do
         pcall(handleWeaponReload)
-        task.wait(0.3) -- Check every 0.1 seconds for faster response
+        task.wait(0.1) -- Check every 0.1 seconds for faster response
     end
 end)
 
