@@ -1129,8 +1129,6 @@ SettingsTab:CreateKeybind({ Name = "Toggle UI", CurrentKeybind = "RightControl",
 -- ==================== TS QUEST TAB ====================
 local TSQuestTab = Window:CreateTab("TS Quest", 4483362458)
 
-TSQuestTab:CreateSection("TS Quest")
-
 TSQuestTab:CreateLabel("🔜 COMING SOON")
 TSQuestTab:CreateLabel("Auto TS Quest features are under development.")
 TSQuestTab:CreateLabel("Stay tuned for updates!")
