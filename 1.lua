@@ -1131,16 +1131,6 @@ SettingsTab:CreateSection("UI Settings")
 SettingsTab:CreateToggle({ Name = "Disable 3D Rendering (FPS Boost)", CurrentValue = false, Flag = "Disable3DRendering", Callback = function(Value) RunService:Set3dRenderingEnabled(not Value) end })
 SettingsTab:CreateKeybind({ Name = "Toggle UI", CurrentKeybind = "RightControl", HoldToInteract = false, Flag = "MenuKeybind", Callback = function(Keybind) end })
 
-SettingsTab:CreateSection("Auto Hide")
-
-local AutoHideToggle = SettingsTab:CreateToggle({
-    Name = "Auto Hide UI on Load",
-    CurrentValue = false,
-    Flag = "AutoHideUIToggle",
-    Callback = function(Value)
-        -- Config save ho jayegi automatically
-    end,
-})
 -- ==================== TS QUEST TAB ====================
 
 TSQuestTab:CreateSection("Thunder Spears Quest")
@@ -1179,24 +1169,6 @@ task.spawn(function() task.wait(0.5); if getgenv().DeleteMap then DeleteMap() en
 -- ExecuteImmediateAutomation loop
 task.spawn(function() while true do pcall(ExecuteImmediateAutomation); task.wait(0.5) end end)
 
--- Auto Hide UI on load (Simple method)
-task.spawn(function()
-    task.wait(3)
-    
-    local shouldHide = false
-    pcall(function()
-        if Rayfield.Flags and Rayfield.Flags.AutoHideUIToggle then
-            shouldHide = Rayfield.Flags.AutoHideUIToggle.CurrentValue
-        end
-    end)
-    
-    if shouldHide then
-        -- Sirf Rayfield UI toggle karo
-        pcall(function()
-            Rayfield:ToggleVisibility()
-            print("Rayfield UI Toggled - Check if hidden")
-        end)
-    end
-end)
+
 
 Rayfield:LoadConfiguration()
