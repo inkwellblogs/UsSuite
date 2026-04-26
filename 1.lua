@@ -181,21 +181,29 @@ function AutoFarm:Start()
 		UpdateStatus("Waiting for mission...")
 		
 		local function checkReady()
-			local char = lp.Character
-			local playerReady = char and (char:GetAttribute("Shifter") or (char:FindFirstChild("Main") and char.Main:FindFirstChild("W")))
-			local mapReady = workspace:FindFirstChild("Unclimbable") and workspace.Unclimbable:FindFirstChild("Reloads") and workspace.Unclimbable.Reloads:FindFirstChild("GasTanks") and workspace.Unclimbable.Reloads.GasTanks:FindFirstChild("Refill")
-			local titans = workspace:FindFirstChild("Titans")
-			local titansReady = false
-			if titans then
-				for _, v in ipairs(titans:GetChildren()) do
-					if v:FindFirstChild("Fake") and v.Fake:FindFirstChild("Head") and v.Fake.Head:FindFirstChild("Header") then
-						titansReady = true
-						break
-					end
-				end
-			end
-			return playerReady and mapReady and titansReady
-		end
+    local char = lp.Character
+    local playerReady = char and (char:GetAttribute("Shifter") or (char:FindFirstChild("Main") and char.Main:FindFirstChild("W")))
+    
+    -- New update: check Props.HQ.GasTanks.Refill
+    local mapReady = workspace:FindFirstChild("Unclimbable") 
+        and workspace.Unclimbable:FindFirstChild("Props")
+        and workspace.Unclimbable.Props:FindFirstChild("HQ")
+        and workspace.Unclimbable.Props.HQ:FindFirstChild("GasTanks")
+        and workspace.Unclimbable.Props.HQ.GasTanks:FindFirstChild("Refill")
+        
+    local titans = workspace:FindFirstChild("Titans")
+    local titansReady = false
+    if titans then
+        for _, v in ipairs(titans:GetChildren()) do
+            if v:FindFirstChild("Fake") and v.Fake:FindFirstChild("Head") and v.Fake.Head:FindFirstChild("Header") then
+                titansReady = true
+                break
+            end
+        end
+    end
+    
+    return playerReady and mapReady and titansReady
+end
 
 		local startTime = os.clock()
 		while self._running and not checkReady() do
@@ -766,11 +774,14 @@ local function handleWeaponReload()
     local weaponType = slot.Weapon
     
     local function findRefillPart()
-        local unclimbable = workspace:FindFirstChild("Unclimbable")
-        if unclimbable then
-            local reloads = unclimbable:FindFirstChild("Reloads")
-            if reloads then
-                local gasTanks = reloads:FindFirstChild("GasTanks")
+    -- New update path: Unclimbable > Props > HQ > GasTanks > Refill
+    local unclimbable = workspace:FindFirstChild("Unclimbable")
+    if unclimbable then
+        local props = unclimbable:FindFirstChild("Props")
+        if props then
+            local hq = props:FindFirstChild("HQ")
+            if hq then
+                local gasTanks = hq:FindFirstChild("GasTanks")
                 if gasTanks then
                     local refill = gasTanks:FindFirstChild("Refill")
                     if refill and refill:IsA("BasePart") then
@@ -779,15 +790,17 @@ local function handleWeaponReload()
                 end
             end
         end
-        
-        -- Fallback search
-        for _, v in ipairs(workspace:GetDescendants()) do
-            if v.Name == "Refill" and v:IsA("BasePart") then
-                return v
-            end
-        end
-        return nil
     end
+    
+    -- Fallback: search entire workspace
+    for _, v in ipairs(workspace:GetDescendants()) do
+        if v.Name == "Refill" and v:IsA("BasePart") then
+            return v
+        end
+    end
+    
+    return nil
+end
     
     local refillPart = findRefillPart()
     local char = lp.Character
