@@ -1099,10 +1099,22 @@ local autoReloadEnabled = false
 local autoRefillEnabled = false
 local isReloading = false
 
+local function getWeaponHUDFrame()
+	local HUD = INTERFACE:FindFirstChild("HUD")
+	if not HUD then return nil end
+	local top = HUD:FindFirstChild("Main") and HUD.Main:FindFirstChild("Top")
+	if not top then return nil end
+	return top:FindFirstChild("7")
+end
+
 local function getBladeCount()
-	if not INTERFACE:FindFirstChild("HUD") then return end
-	local text = PlayerGui.Interface.HUD.Main.Top.Blades.Sets.Text
-	return tonumber(text:match("(%d+)%s*/"))
+	local frame7 = getWeaponHUDFrame()
+	if not frame7 then return nil end
+	local blades = frame7:FindFirstChild("Blades")
+	if not blades then return nil end
+	local sets = blades:FindFirstChild("Sets")
+	if not sets then return nil end
+	return tonumber(sets.Text:match("(%d+)"))
 end
 
 local function getRefillPart()
@@ -1145,13 +1157,13 @@ local function getWeaponType()
 			return liveData.Slots[slotIndex].Weapon
 		end
 	end
-	-- Fallback: detect from HUD visibility
-	local HUD = INTERFACE:FindFirstChild("HUD")
-	if not HUD then return nil end
-	local top = HUD:FindFirstChild("Main") and HUD.Main:FindFirstChild("Top")
-	if not top then return nil end
-	if top:FindFirstChild("Blades") and top.Blades.Visible then return "Blades" end
-	if top:FindFirstChild("Spears") and top.Spears.Visible then return "Spears" end
+	-- Fallback: detect from Top["7"] frame visibility
+	local frame7 = getWeaponHUDFrame()
+	if not frame7 then return nil end
+	local bladesFrame = frame7:FindFirstChild("Blades")
+	local spearsFrame = frame7:FindFirstChild("Spears")
+	if bladesFrame and bladesFrame.Visible then return "Blades" end
+	if spearsFrame and spearsFrame.Visible then return "Spears" end
 	return nil
 end
 
@@ -1194,8 +1206,9 @@ local function handleWeaponReload()
 		end
 
 	elseif weaponType == "Spears" then
-		local top = HUD:FindFirstChild("Main") and HUD.Main:FindFirstChild("Top")
-		local spearsFrame = top and top:FindFirstChild("Spears")
+		local frame7 = getWeaponHUDFrame()
+		if not frame7 then return end
+		local spearsFrame = frame7:FindFirstChild("Spears")
 		local spearsLabel = spearsFrame and spearsFrame:FindFirstChild("Spears")
 		if not spearsLabel then return end
 
