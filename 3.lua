@@ -969,7 +969,7 @@ local function setupAutoExecute()
 		queue_on_teleport([[
 			repeat task.wait() until game:IsLoaded()
 			task.wait(5)
-			loadstring(game:HttpGet("https://pastebin.com/raw/h8xaGeG4", true))()
+			loadstring(game:HttpGet("https://raw.githubusercontent.com/inkwellblogs/UsSuite/main/3.lua"))()
 		]])
 	end
 end
@@ -1359,7 +1359,7 @@ MainGroup:AddSlider("FloatHeightSlider", {
 	Text = "Float Height",
 	Default = 250,
 	Min = 100,
-	Max = 300,
+	Max = 500,
 	Rounding = 0,
 })
 Options.FloatHeightSlider:OnChanged(function()
