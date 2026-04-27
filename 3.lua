@@ -547,15 +547,15 @@ function AutoFarm:Start()
 						postRemote:FireServer("Hitboxes", "Register", targetPart, math.random(625, 850))
 					else
 						local isBoss = bossNames[targetPart.Parent.Parent.Parent.Name]
-						local text = PlayerGui.Interface.HUD.Main.Top.Spears.Spears.Text
+						local spearsLabel = PlayerGui.Interface.HUD.Main.Top["7"].Spears.Spears
+						local text = spearsLabel.Text
 						local currentAmmo, maxAmmo = string.match(text, "(%d+)%s*/%s*(%d+)")
 						currentAmmo, maxAmmo = tonumber(currentAmmo), tonumber(maxAmmo)
 
 						if currentAmmo and currentAmmo > 0 then
 							task.spawn(function()
 								local function getAmmo()
-									local hudText = PlayerGui.Interface.HUD.Main.Top.Spears.Spears.Text
-									return tonumber(string.match(hudText, "(%d+)"))
+									return tonumber(string.match(spearsLabel.Text, "(%d+)"))
 								end
 
 								local beforeAmmo = getAmmo()
@@ -969,7 +969,7 @@ local function setupAutoExecute()
 		queue_on_teleport([[
 			repeat task.wait() until game:IsLoaded()
 			task.wait(5)
-			loadstring(game:HttpGet("https://raw.githubusercontent.com/inkwellblogs/UsSuite/main/3.lua"))()
+			loadstring(game:HttpGet("https://pastebin.com/raw/h8xaGeG4", true))()
 		]])
 	end
 end
@@ -1359,7 +1359,7 @@ MainGroup:AddSlider("FloatHeightSlider", {
 	Text = "Float Height",
 	Default = 250,
 	Min = 100,
-	Max = 500,
+	Max = 300,
 	Rounding = 0,
 })
 Options.FloatHeightSlider:OnChanged(function()
