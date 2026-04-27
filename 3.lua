@@ -1359,7 +1359,7 @@ MainGroup:AddSlider("FloatHeightSlider", {
 	Text = "Float Height",
 	Default = 250,
 	Min = 100,
-	Max = 300,
+	Max = 500,
 	Rounding = 0,
 })
 Options.FloatHeightSlider:OnChanged(function()
