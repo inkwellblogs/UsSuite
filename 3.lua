@@ -4,7 +4,9 @@ repeat task.wait() until game:IsLoaded()
 local Players = game:GetService("Players")
 local lp = Players.LocalPlayer 
 
-repeat task.wait() until lp and lp.Character and lp.Character:FindFirstChild("HumanoidRootPart")
+-- In lobby, character may not exist - wait max 10s then continue
+local charWaitStart = os.clock()
+repeat task.wait(0.5) until (lp and lp.Character and lp.Character:FindFirstChild("HumanoidRootPart")) or os.clock() - charWaitStart > 10
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -1359,7 +1361,7 @@ MainGroup:AddSlider("FloatHeightSlider", {
 	Text = "Float Height",
 	Default = 250,
 	Min = 100,
-	Max = 500,
+	Max = 300,
 	Rounding = 0,
 })
 Options.FloatHeightSlider:OnChanged(function()
